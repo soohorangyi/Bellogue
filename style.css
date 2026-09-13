@@ -1,3 +1,61 @@
+/* 포인트 컬러 테마 (설정 탭에서 선택) */
+:root {
+  --bellogue-accent: #6B4444;      /* 기본값: 와인 버건디 */
+  --bellogue-accent-2: #4A3838;
+}
+:root[data-bellogue-theme="burgundy"] {
+  --bellogue-accent: #6B4444;
+  --bellogue-accent-2: #4A3838;
+}
+:root[data-bellogue-theme="slate"] {
+  --bellogue-accent: #5E7E9C;
+  --bellogue-accent-2: #45607A;
+}
+:root[data-bellogue-theme="sage"] {
+  --bellogue-accent: #7C8F5E;
+  --bellogue-accent-2: #5E6E44;
+}
+:root[data-bellogue-theme="rose"] {
+  --bellogue-accent: #9C4F5E;
+  --bellogue-accent-2: #7A3A46;
+}
+
+/* 확장프로그램 관리 탭 — 설정 패널 */
+#bellogue-settings .inline-drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 2px 4px;
+}
+#bellogue-settings label {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+#bellogue-settings .checkbox_label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+#bellogue-settings .bellogue-settings-label {
+  font-size: 11px;
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+#bellogue-settings .bellogue-radio-row {
+  display: flex;
+  gap: 14px;
+}
+#bellogue-settings .bellogue-radio-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-top: 0;
+}
+
 #bellogue-overlay {
   position: fixed;
   inset: 0;
@@ -100,11 +158,11 @@
   opacity: 1;
 }
 .bellogue-tab-guestbook {
-  background: #B5654F;
+  background: var(--bellogue-accent);
   top: 24px;
 }
 .bellogue-tab-diary {
-  background: #6E7E5A;
+  background: var(--bellogue-accent-2);
   top: 94px;
 }
 
