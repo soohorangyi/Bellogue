@@ -178,11 +178,6 @@ function buildBellogueDialog() {
     const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
     if (!inside) dialog.close();
   });
-  dialog.addEventListener('close', function () {
-    dialog.classList.remove('bellogue-open');
-    dialog._manageMode = false;
-    showCover(dialog);
-  });
 
   return dialog;
 }
@@ -496,6 +491,7 @@ function showWrite(dialog, editingId) {
   scroll.querySelector('#bellogue-write-image-input').addEventListener('change', async function () {
     const file = this.files[0];
     if (!file) return;
+    if (!dialog.open) dialog.showModal();
     pendingImage = await resizeImageFile(file, 600, 600);
   });
 
