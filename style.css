@@ -130,6 +130,6 @@ dialog#bellogue-dialog.bellogue-open .bellogue-index-tabs { display: flex; }
 @media (max-width: 480px) {
   dialog#bellogue-dialog { width: 92vw; }
   dialog#bellogue-dialog.bellogue-open { width: 92vw; }
-  .bellogue-frame { height: auto; max-height: 82dvh; }
-  .bellogue-scroll { max-height: 82dvh; }
+  .bellogue-frame { height: 138vw; } /* 표지: 데스크탑과 동일한 2:3 비율 유지 */
+  dialog#bellogue-dialog.bellogue-open .bellogue-frame { height: 82dvh; } /* 펼친 상태: 탭 바뀌어도 항상 고정 */
 }
