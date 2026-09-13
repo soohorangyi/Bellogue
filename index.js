@@ -1,4 +1,4 @@
-// Bellogue — 개인 다이어리 확장프로그램 (마법봉 메뉴 + 모달 + 설정 패널)
+// Bellogue — 개인 다이어리 확장프로그램
 
 import { extension_settings } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
@@ -6,19 +6,24 @@ import { saveSettingsDebounced } from "../../../../script.js";
 const extensionName = "bellogue";
 
 const defaultSettings = {
-  nickname: "",             // 일기/방명록에 쓸 내 필명
-  colorTheme: "burgundy",    // burgundy / slate / sage / rose
-  language: "ko",            // 출력 언어: ko / en
-  connectionProfile: "",     // 생성에 쓸 연결 프로필 (빈 값 = 메인 프로필 사용)
+  nickname: "",
+  colorTheme: "burgundy",
+  language: "ko",
+  connectionProfile: "",
+  birthday: "",
+  zodiac: "",
+  district: "",
+  job: "",
+  intro: "",
+  profileImage: "",   // base64 data URL
+  posts: [],          // [{ id, title, body, image, date, comments:[{id,name,text}] }]
 };
 
 function getSettings() {
-  if (!extension_settings[extensionName]) {
-    extension_settings[extensionName] = {};
-  }
+  if (!extension_settings[extensionName]) extension_settings[extensionName] = {};
   const s = extension_settings[extensionName];
   for (const key in defaultSettings) {
-    if (s[key] === undefined) s[key] = defaultSettings[key];
+    if (s[key] === undefined) s[key] = JSON.parse(JSON.stringify(defaultSettings[key]));
   }
   return s;
 }
@@ -27,8 +32,6 @@ function applyColorTheme(theme) {
   document.documentElement.setAttribute('data-bellogue-theme', theme);
 }
 
-// ST의 연결 프로필 드롭다운(#connection_profiles)에서 그대로 목록을 읽어옴
-// (FM 42.9 / 단어장 확장프로그램과 동일한 방식)
 function getConnectionProfiles() {
   const profiles = [{ value: '', label: '메인 프로필 사용 (기본)' }];
   $('#connection_profiles option').each(function () {
@@ -39,25 +42,48 @@ function getConnectionProfiles() {
   return profiles;
 }
 
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function resizeImageFile(file, maxW, maxH) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        const ratio = Math.min(maxW / w, maxH / h, 1);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── 확장프로그램 관리 탭 설정 패널 ──────────────────────────────
 jQuery(async () => {
   const settings = getSettings();
   applyColorTheme(settings.colorTheme);
 
-  // 마법봉 메뉴 버튼
-  const buttonHtml = `
+  $('#extensionsMenu').append(`
     <div id="bellogue-menu-button" class="list-group-item flex-container flexGap5">
         <div class="fa-solid fa-book extensionsMenuExtensionButton"></div>
         <span>Bellogue</span>
-    </div>`;
-  $('#extensionsMenu').append(buttonHtml);
+    </div>`);
   $('#bellogue-menu-button').on('click', openBellogueModal);
 
-  // 확장프로그램 관리 탭 — 설정 패널
-  const profileOptions = getConnectionProfiles()
-    .map(p => `<option value="${p.value}">${p.label}</option>`)
-    .join('');
+  const profileOptions = getConnectionProfiles().map(p => `<option value="${p.value}">${p.label}</option>`).join('');
 
-  const settingsHtml = `
+  $('#extensions_settings2').append(`
     <div id="bellogue-settings">
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
@@ -66,7 +92,7 @@ jQuery(async () => {
         </div>
         <div class="inline-drawer-content">
 
-          <label for="bellogue-nickname">내 필명 (일기/방명록에 표시)</label>
+          <label for="bellogue-nickname">내 필명</label>
           <input id="bellogue-nickname" type="text" class="text_pole" placeholder="예: 클로이">
 
           <label for="bellogue-color-theme">포인트 컬러</label>
@@ -79,54 +105,58 @@ jQuery(async () => {
 
           <div class="bellogue-settings-label">출력 언어</div>
           <div class="bellogue-radio-row">
-            <label>
-              <input type="radio" name="bellogue-language" value="ko">
-              <span>🇰🇷 한국어</span>
-            </label>
-            <label>
-              <input type="radio" name="bellogue-language" value="en">
-              <span>🇺🇸 English</span>
-            </label>
+            <label><input type="radio" name="bellogue-language" value="ko"><span>🇰🇷 한국어</span></label>
+            <label><input type="radio" name="bellogue-language" value="en"><span>🇺🇸 English</span></label>
           </div>
 
           <label for="bellogue-connection-profile">연결 프로필</label>
           <select id="bellogue-connection-profile" class="text_pole">${profileOptions}</select>
 
+          <div class="bellogue-settings-label" style="margin-top:12px;">프로필 정보</div>
+          <label for="bellogue-birthday">🎂 생년월일</label>
+          <input id="bellogue-birthday" type="text" class="text_pole" placeholder="예: 3월 4일">
+          <label for="bellogue-zodiac">✨ 별자리</label>
+          <input id="bellogue-zodiac" type="text" class="text_pole" placeholder="예: 물고기자리">
+          <label for="bellogue-district">📍 거주구역</label>
+          <input id="bellogue-district" type="text" class="text_pole" placeholder="예: 항구 지구">
+          <label for="bellogue-job">💼 직업</label>
+          <input id="bellogue-job" type="text" class="text_pole" placeholder="예: 카페 바리스타">
+          <label for="bellogue-intro">한줄 소개</label>
+          <input id="bellogue-intro" type="text" class="text_pole" placeholder="짧은 자기소개">
+
         </div>
       </div>
     </div>
-  `;
-  $('#extensions_settings2').append(settingsHtml);
+  `);
 
-  // 저장된 값으로 UI 초기화
-  $('#bellogue-nickname').val(settings.nickname);
-  $('#bellogue-color-theme').val(settings.colorTheme);
-  $(`input[name="bellogue-language"][value="${settings.language}"]`).prop('checked', true);
-  $('#bellogue-connection-profile').val(settings.connectionProfile);
-
-  // 값 바뀌면 저장
-  $('#bellogue-nickname').on('input', function () {
-    settings.nickname = $(this).val();
-    saveSettingsDebounced();
+  const fields = ['nickname', 'birthday', 'zodiac', 'district', 'job', 'intro'];
+  fields.forEach(f => {
+    $(`#bellogue-${f}`).val(settings[f]).on('input', function () {
+      settings[f] = $(this).val();
+      saveSettingsDebounced();
+    });
   });
-  $('#bellogue-color-theme').on('change', function () {
+  $('#bellogue-color-theme').val(settings.colorTheme).on('change', function () {
     settings.colorTheme = $(this).val();
     applyColorTheme(settings.colorTheme);
     saveSettingsDebounced();
   });
+  $(`input[name="bellogue-language"][value="${settings.language}"]`).prop('checked', true);
   $('input[name="bellogue-language"]').on('change', function () {
     settings.language = $(this).val();
     saveSettingsDebounced();
   });
-  $('#bellogue-connection-profile').on('change', function () {
+  $('#bellogue-connection-profile').val(settings.connectionProfile).on('change', function () {
     settings.connectionProfile = $(this).val();
     saveSettingsDebounced();
   });
 });
 
+// ── 모달 ─────────────────────────────────────────────────────
 function openBellogueModal() {
   let dialog = document.getElementById('bellogue-dialog');
   if (!dialog) dialog = buildBellogueDialog();
+  dialog._manageMode = false;
   showCover(dialog);
   dialog.showModal();
 }
@@ -134,7 +164,6 @@ function openBellogueModal() {
 function buildBellogueDialog() {
   const dialog = document.createElement('dialog');
   dialog.id = 'bellogue-dialog';
-  dialog.className = 'bellogue-dialog';
   dialog.innerHTML = `
     <div class="bellogue-frame">
       <div class="bellogue-scroll" id="bellogue-scroll"></div>
@@ -143,14 +172,14 @@ function buildBellogueDialog() {
   `;
   document.body.appendChild(dialog);
 
-  // 뒷배경(backdrop) 클릭하면 닫기
   dialog.addEventListener('click', function (e) {
     const rect = dialog.getBoundingClientRect();
     const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
     if (!inside) dialog.close();
   });
-  // 다음에 열 때는 항상 표지부터 다시 보이게
   dialog.addEventListener('close', function () {
+    dialog.classList.remove('bellogue-open');
+    dialog._manageMode = false;
     showCover(dialog);
   });
 
@@ -158,8 +187,7 @@ function buildBellogueDialog() {
 }
 
 const BELLOGUE_TABS = [
-  { id: 'diary', label: '일기' },
-  { id: 'guestbook', label: '방명록' },
+  { id: 'blog', label: '내 벨로그' },
   { id: 'board', label: '주민센터' },
 ];
 
@@ -167,6 +195,7 @@ function showCover(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
   const tabsBox = dialog.querySelector('#bellogue-index-tabs');
   tabsBox.innerHTML = '';
+  dialog.classList.remove('bellogue-open');
 
   scroll.innerHTML = `
     <div class="bellogue-cover">
@@ -176,58 +205,223 @@ function showCover(dialog) {
       <button id="bellogue-open-btn" class="bellogue-open-btn">OPEN</button>
     </div>
   `;
-
   scroll.querySelector('#bellogue-open-btn').addEventListener('click', function () {
-    showBellogueTab(dialog, 'diary');
+    dialog.classList.add('bellogue-open');
+    showTab(dialog, 'blog');
   });
 }
 
-function showBellogueTab(dialog, name) {
-  const scroll = dialog.querySelector('#bellogue-scroll');
+function renderIndexTabs(dialog, active) {
   const tabsBox = dialog.querySelector('#bellogue-index-tabs');
+  tabsBox.innerHTML = BELLOGUE_TABS.map(t =>
+    `<div class="bellogue-index-tab${t.id === active ? ' active' : ''}" data-tab="${t.id}">${t.label}</div>`
+  ).join('');
+  tabsBox.querySelectorAll('.bellogue-index-tab').forEach(el => {
+    el.addEventListener('click', () => showTab(dialog, el.dataset.tab));
+  });
+}
 
-  tabsBox.innerHTML = BELLOGUE_TABS.map(function (t) {
-    return `<div class="bellogue-index-tab${t.id === name ? ' active' : ''}" data-tab="${t.id}">${t.label}</div>`;
-  }).join('');
-  tabsBox.querySelectorAll('.bellogue-index-tab').forEach(function (el) {
-    el.addEventListener('click', function () {
-      showBellogueTab(dialog, el.dataset.tab);
-    });
+function showTab(dialog, name) {
+  renderIndexTabs(dialog, name);
+  const scroll = dialog.querySelector('#bellogue-scroll');
+  if (name === 'board') {
+    scroll.innerHTML = boardHtml();
+  } else {
+    scroll.innerHTML = blogHtml(dialog);
+    wireBlogEvents(dialog);
+  }
+}
+
+// ── 내 벨로그 (프로필 + 피드) ────────────────────────────────
+function blogHtml(dialog) {
+  const s = getSettings();
+  return `
+    <div class="bellogue-page bellogue-profile-page">${profileHtml(s)}</div>
+    <div class="bellogue-page bellogue-feed-page">${feedHtml(s, !!dialog._manageMode)}</div>
+  `;
+}
+
+function profileHtml(s) {
+  const avatarBg = s.profileImage ? `background-image:url('${s.profileImage}');background-size:cover;background-position:center;` : '';
+  const recent = s.posts.slice(0, 2);
+  const recentHtml = recent.length
+    ? recent.map(p => `<p class="bellogue-recent-row"><span>${escapeHtml(p.title)}</span><span class="bellogue-meta">${escapeHtml(p.date)}</span></p>`).join('')
+    : `<p class="bellogue-placeholder-sm">아직 쓴 글이 없어요</p>`;
+
+  return `
+    <div class="bellogue-avatar" id="bellogue-avatar" style="${avatarBg}">
+      ${s.profileImage ? '' : '<i class="fa-solid fa-moon"></i>'}
+      <span class="bellogue-avatar-cam"><i class="fa-solid fa-camera"></i></span>
+    </div>
+    <input type="file" id="bellogue-avatar-input" accept="image/*" style="display:none;">
+    <p class="bellogue-name">${escapeHtml(s.nickname) || '이름 없음'}</p>
+    <div class="bellogue-info-grid">
+      ${s.birthday ? `<span>🎂 ${escapeHtml(s.birthday)}</span>` : ''}
+      ${s.zodiac ? `<span>✨ ${escapeHtml(s.zodiac)}</span>` : ''}
+      ${s.district ? `<span>📍 ${escapeHtml(s.district)}</span>` : ''}
+      ${s.job ? `<span>💼 ${escapeHtml(s.job)}</span>` : ''}
+    </div>
+    ${s.intro ? `<p class="bellogue-intro">"${escapeHtml(s.intro)}"</p>` : ''}
+    <div class="bellogue-section-tag">✍ 최근 글</div>
+    <div class="bellogue-recent-list">${recentHtml}</div>
+  `;
+}
+
+function feedHtml(s, manageMode) {
+  const postsHtml = s.posts.length
+    ? s.posts.map(p => postHtml(p, manageMode)).join('')
+    : `<p class="bellogue-placeholder">아직 쓴 글이 없어요.<br>글쓰기로 첫 글을 남겨보세요.</p>`;
+
+  return `
+    <div class="bellogue-feed-header">
+      <span id="bellogue-manage-btn" class="bellogue-icon-btn" title="글 관리"><i class="fa-solid fa-gear"></i></span>
+      <span id="bellogue-write-btn" class="bellogue-write-btn"><i class="fa-solid fa-feather"></i> 글쓰기</span>
+    </div>
+    <div class="bellogue-post-list">${postsHtml}</div>
+  `;
+}
+
+function postHtml(post, manageMode) {
+  const img = post.image ? `<div class="bellogue-post-image" style="background-image:url('${post.image}')"></div>` : '';
+  const editDel = manageMode ? `
+    <span class="bellogue-post-edit" data-id="${post.id}">수정</span>
+    <span class="bellogue-post-delete" data-id="${post.id}">삭제</span>` : '';
+  const comments = (post.comments || []).map(c => `
+    <div class="bellogue-comment-row">
+      <p><span class="bellogue-comment-name">${escapeHtml(c.name)}</span> ${escapeHtml(c.text)}</p>
+      ${manageMode ? `<span class="bellogue-comment-delete" data-post="${post.id}" data-comment="${c.id}">삭제</span>` : ''}
+    </div>`).join('');
+
+  return `
+    <div class="bellogue-post" data-id="${post.id}">
+      <div class="bellogue-post-head">
+        <p class="bellogue-post-title">${escapeHtml(post.title)}</p>
+        <div class="bellogue-post-head-right"><span class="bellogue-meta">${escapeHtml(post.date)}</span>${editDel}</div>
+      </div>
+      ${img}
+      <p class="bellogue-post-body">${escapeHtml(post.body)}</p>
+      ${comments}
+    </div>
+  `;
+}
+
+function wireBlogEvents(dialog) {
+  const scroll = dialog.querySelector('#bellogue-scroll');
+
+  const avatar = scroll.querySelector('#bellogue-avatar');
+  const fileInput = scroll.querySelector('#bellogue-avatar-input');
+  avatar.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async function () {
+    const file = this.files[0];
+    if (!file) return;
+    const dataUrl = await resizeImageFile(file, 400, 500);
+    const s = getSettings();
+    s.profileImage = dataUrl;
+    saveSettingsDebounced();
+    showTab(dialog, 'blog');
   });
 
-  const masthead = `
-    <div class="bellogue-masthead">
-      <i id="bellogue-close" class="fa-solid fa-xmark"></i>
-      <p class="bellogue-tagline">ARS IN NOCTE</p>
-      <p class="bellogue-logo">BELLOGUE</p>
+  scroll.querySelector('#bellogue-manage-btn').addEventListener('click', function () {
+    dialog._manageMode = !dialog._manageMode;
+    showTab(dialog, 'blog');
+  });
+
+  scroll.querySelector('#bellogue-write-btn').addEventListener('click', function () {
+    showWrite(dialog, null);
+  });
+
+  scroll.querySelectorAll('.bellogue-post-edit').forEach(el => {
+    el.addEventListener('click', function () {
+      showWrite(dialog, this.dataset.id);
+    });
+  });
+  scroll.querySelectorAll('.bellogue-post-delete').forEach(el => {
+    el.addEventListener('click', function () {
+      if (!confirm('이 글을 삭제할까요?')) return;
+      const s = getSettings();
+      s.posts = s.posts.filter(p => p.id !== this.dataset.id);
+      saveSettingsDebounced();
+      showTab(dialog, 'blog');
+    });
+  });
+  scroll.querySelectorAll('.bellogue-comment-delete').forEach(el => {
+    el.addEventListener('click', function () {
+      if (!confirm('이 댓글을 삭제할까요?')) return;
+      const s = getSettings();
+      const post = s.posts.find(p => p.id === this.dataset.post);
+      if (post) post.comments = (post.comments || []).filter(c => c.id !== this.dataset.comment);
+      saveSettingsDebounced();
+      showTab(dialog, 'blog');
+    });
+  });
+}
+
+// ── 글쓰기 ───────────────────────────────────────────────────
+function showWrite(dialog, editingId) {
+  const s = getSettings();
+  const editingPost = editingId ? s.posts.find(p => p.id === editingId) : null;
+  const scroll = dialog.querySelector('#bellogue-scroll');
+
+  scroll.innerHTML = `
+    <div class="bellogue-write">
+      <p id="bellogue-write-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 뒤로</p>
+      <input id="bellogue-write-title" type="text" class="bellogue-write-title-input" placeholder="제목을 입력하세요" value="${editingPost ? escapeHtml(editingPost.title) : ''}">
+      <textarea id="bellogue-write-body" class="bellogue-write-textarea" placeholder="오늘 있었던 일을 적어보세요...">${editingPost ? escapeHtml(editingPost.body) : ''}</textarea>
+      <input type="file" id="bellogue-write-image-input" accept="image/*" style="display:none;">
+      <div class="bellogue-write-actions">
+        <button id="bellogue-write-image-btn" class="bellogue-btn-outline" type="button">이미지 첨부</button>
+        <button id="bellogue-write-submit" class="bellogue-btn-primary" type="button">${editingPost ? '수정 완료' : '등록'}</button>
+      </div>
     </div>
   `;
 
-  if (name === 'board') {
-    scroll.innerHTML = masthead + `
-      <div class="bellogue-board">
-        <div class="bellogue-board-header">
-          <button class="bellogue-write-btn">글쓰기</button>
-        </div>
-        <div class="bellogue-board-list">
-          <p class="bellogue-placeholder">주민센터 (준비 중)</p>
-        </div>
-      </div>
-    `;
-  } else {
-    scroll.innerHTML = masthead + `
-      <div class="bellogue-spread">
-        <div class="bellogue-page bellogue-active" id="bellogue-page-diary">
-          <p class="bellogue-placeholder">일기 페이지 (준비 중)</p>
-        </div>
-        <div class="bellogue-page" id="bellogue-page-guestbook">
-          <p class="bellogue-placeholder">방명록 페이지 (준비 중)</p>
-        </div>
-      </div>
-    `;
-    scroll.querySelector('#bellogue-page-diary').classList.toggle('bellogue-active', name === 'diary');
-    scroll.querySelector('#bellogue-page-guestbook').classList.toggle('bellogue-active', name === 'guestbook');
-  }
+  let pendingImage = editingPost ? editingPost.image || '' : '';
 
-  scroll.querySelector('#bellogue-close').addEventListener('click', () => dialog.close());
+  scroll.querySelector('#bellogue-write-back').addEventListener('click', () => showTab(dialog, 'blog'));
+
+  scroll.querySelector('#bellogue-write-image-btn').addEventListener('click', function () {
+    scroll.querySelector('#bellogue-write-image-input').click();
+  });
+  scroll.querySelector('#bellogue-write-image-input').addEventListener('change', async function () {
+    const file = this.files[0];
+    if (!file) return;
+    pendingImage = await resizeImageFile(file, 600, 600);
+  });
+
+  scroll.querySelector('#bellogue-write-submit').addEventListener('click', function () {
+    const title = scroll.querySelector('#bellogue-write-title').value.trim();
+    const body = scroll.querySelector('#bellogue-write-body').value.trim();
+    if (!title || !body) { alert('제목과 내용을 모두 입력해주세요.'); return; }
+
+    const s2 = getSettings();
+    if (editingPost) {
+      editingPost.title = title;
+      editingPost.body = body;
+      if (pendingImage) editingPost.image = pendingImage;
+    } else {
+      s2.posts.unshift({
+        id: 'post_' + Date.now(),
+        title, body,
+        image: pendingImage,
+        date: new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),
+        comments: [],
+      });
+    }
+    saveSettingsDebounced();
+    showTab(dialog, 'blog');
+  });
+}
+
+// ── 주민센터 (준비 중) ───────────────────────────────────────
+function boardHtml() {
+  return `
+    <div class="bellogue-board">
+      <div class="bellogue-board-header">
+        <button class="bellogue-write-btn">글쓰기</button>
+      </div>
+      <div class="bellogue-board-list">
+        <p class="bellogue-placeholder">주민센터 (준비 중)</p>
+      </div>
+    </div>
+  `;
 }
