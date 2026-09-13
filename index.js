@@ -157,6 +157,7 @@ function openBellogueModal() {
   let dialog = document.getElementById('bellogue-dialog');
   if (!dialog) dialog = buildBellogueDialog();
   dialog._manageMode = false;
+  dialog._mobileSub = 'profile';
   showCover(dialog);
   dialog.showModal();
 }
@@ -235,9 +236,14 @@ function showTab(dialog, name) {
 // ── 내 벨로그 (프로필 + 피드) ────────────────────────────────
 function blogHtml(dialog) {
   const s = getSettings();
+  const sub = dialog._mobileSub || 'profile';
   return `
-    <div class="bellogue-page bellogue-profile-page">${profileHtml(s)}</div>
-    <div class="bellogue-page bellogue-feed-page">${feedHtml(s, !!dialog._manageMode)}</div>
+    <div class="bellogue-mobile-subtabs">
+      <span data-sub="profile" class="${sub === 'profile' ? 'active' : ''}">프로필</span>
+      <span data-sub="feed" class="${sub === 'feed' ? 'active' : ''}">피드</span>
+    </div>
+    <div class="bellogue-page bellogue-profile-page${sub === 'profile' ? ' bellogue-mobile-active' : ''}">${profileHtml(s)}</div>
+    <div class="bellogue-page bellogue-feed-page${sub === 'feed' ? ' bellogue-mobile-active' : ''}">${feedHtml(s, !!dialog._manageMode)}</div>
   `;
 }
 
@@ -406,6 +412,13 @@ function showAvatarCropper(dialog, srcDataUrl) {
 function wireBlogEvents(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
 
+  scroll.querySelectorAll('.bellogue-mobile-subtabs span').forEach(el => {
+    el.addEventListener('click', function () {
+      dialog._mobileSub = this.dataset.sub;
+      showTab(dialog, 'blog');
+    });
+  });
+
   const avatar = scroll.querySelector('#bellogue-avatar');
   const fileInput = scroll.querySelector('#bellogue-avatar-input');
   avatar.addEventListener('click', () => fileInput.click());
@@ -475,7 +488,7 @@ function showWrite(dialog, editingId) {
 
   let pendingImage = editingPost ? editingPost.image || '' : '';
 
-  scroll.querySelector('#bellogue-write-back').addEventListener('click', () => showTab(dialog, 'blog'));
+  scroll.querySelector('#bellogue-write-back').addEventListener('click', () => { dialog._mobileSub = 'feed'; showTab(dialog, 'blog'); });
 
   scroll.querySelector('#bellogue-write-image-btn').addEventListener('click', function () {
     scroll.querySelector('#bellogue-write-image-input').click();
@@ -506,6 +519,7 @@ function showWrite(dialog, editingId) {
       });
     }
     saveSettingsDebounced();
+    dialog._mobileSub = 'feed';
     showTab(dialog, 'blog');
   });
 }
