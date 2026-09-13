@@ -1,41 +1,36 @@
-/* 포인트 컬러 테마 (설정 탭에서 선택) */
+/* Bellogue — 벨 누아 신문/주민센터 사이트와 동일한 디자인 토큰 사용 */
+
 :root {
-  --bellogue-accent: #6B4444;      /* 기본값: 와인 버건디 */
-  --bellogue-accent-2: #4A3838;
+  --bn-paper: #FBFAF7;
+  --bn-ink: #242220;
+  --bn-ink-soft: #3A362F;
+  --bn-muted: #8A8477;
+  --bn-line: #E5DED2;
+  --bn-border: #35322C;
+  --bn-accent: #6B4444;
+  --bn-accent-tint: rgba(107, 68, 68, 0.14);
 }
 :root[data-bellogue-theme="burgundy"] {
-  --bellogue-accent: #6B4444;
-  --bellogue-accent-2: #4A3838;
+  --bn-accent: #6B4444;
+  --bn-accent-tint: rgba(107, 68, 68, 0.14);
 }
 :root[data-bellogue-theme="slate"] {
-  --bellogue-accent: #5E7E9C;
-  --bellogue-accent-2: #45607A;
+  --bn-accent: #5E7E9C;
+  --bn-accent-tint: rgba(94, 126, 156, 0.14);
 }
 :root[data-bellogue-theme="sage"] {
-  --bellogue-accent: #7C8F5E;
-  --bellogue-accent-2: #5E6E44;
+  --bn-accent: #7C8F5E;
+  --bn-accent-tint: rgba(124, 143, 94, 0.14);
 }
 :root[data-bellogue-theme="rose"] {
-  --bellogue-accent: #9C4F5E;
-  --bellogue-accent-2: #7A3A46;
+  --bn-accent: #9C4F5E;
+  --bn-accent-tint: rgba(156, 79, 94, 0.14);
 }
 
-/* 확장프로그램 관리 탭 — 설정 패널 */
-#bellogue-settings .inline-drawer-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 2px 4px;
-}
+/* ── 확장프로그램 관리 탭 — 설정 패널 ── */
 #bellogue-settings label {
   font-size: 12px;
   opacity: 0.85;
-  margin-top: 4px;
-}
-#bellogue-settings .checkbox_label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   margin-top: 4px;
 }
 #bellogue-settings .bellogue-settings-label {
@@ -56,122 +51,159 @@
   margin-top: 0;
 }
 
-#bellogue-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-#bellogue-modal {
-  display: flex;
-  align-items: stretch;
-  background: #3A2E28;
-  border-radius: 10px;
-  padding: 14px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  width: 100%;
-  max-width: 620px;
-  height: 420px;
-  box-sizing: border-box;
-}
-
-.bellogue-page {
-  flex: 1;
-  background: #F3ECDD;
-  border-radius: 3px;
-  position: relative;
-  padding: 16px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.bellogue-spine {
-  width: 14px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-evenly;
-  align-items: center;
-}
-.bellogue-spine span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #241B17;
-  display: block;
-}
-
-.bellogue-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  flex-shrink: 0;
-}
-.bellogue-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #4A3A28;
-  letter-spacing: 0.5px;
-}
-#bellogue-close {
-  cursor: pointer;
-  color: #8A7A5C;
-  font-size: 16px;
-}
-#bellogue-close:hover {
-  color: #4A3A28;
-}
-
-.bellogue-page-body {
-  flex: 1;
+/* ── 모달 (dialog 요소 — top layer라 ST 쪽 transform에 영향 안 받음) ── */
+dialog#bellogue-dialog {
+  font-family: 'Noto Serif KR', serif;
+  color: var(--bn-ink);
+  background: var(--bn-paper);
+  border: 0.5px solid var(--bn-border);
+  border-radius: 2px;
+  padding: 0;
+  width: min(640px, 94vw);
+  max-width: 640px;
+  max-height: 90dvh;
   overflow-y: auto;
 }
-.bellogue-placeholder {
-  font-size: 13px;
-  color: #8A7A5C;
-  text-align: center;
-  margin-top: 40px;
+dialog#bellogue-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
 }
 
-.bellogue-tab {
+.bellogue-inner {
+  padding: 24px 22px 28px;
+}
+
+/* 마스트헤드 */
+.bellogue-masthead {
+  text-align: center;
+  position: relative;
+  margin-bottom: 12px;
+}
+.bellogue-masthead #bellogue-close {
   position: absolute;
-  top: 24px;
-  right: -13px;
-  font-size: 10px;
-  color: #F3ECDD;
-  padding: 10px 4px;
-  border-radius: 0 4px 4px 0;
-  writing-mode: vertical-rl;
+  right: 0;
+  top: 2px;
+  font-size: 15px;
+  color: var(--bn-ink-soft);
   cursor: pointer;
-  opacity: 0.75;
 }
-.bellogue-tab.active {
-  opacity: 1;
+.bellogue-tagline {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--bn-muted);
+  margin: 0 0 5px;
 }
-.bellogue-tab-guestbook {
-  background: var(--bellogue-accent);
-  top: 24px;
+.bellogue-logo {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin: 0;
 }
-.bellogue-tab-diary {
-  background: var(--bellogue-accent-2);
-  top: 94px;
+
+/* 탭 내비게이션 */
+.bellogue-nav {
+  display: flex;
+  border-bottom: 0.5px solid var(--bn-line);
+  margin-bottom: 16px;
+}
+.bellogue-nav a {
+  font-size: 12.5px;
+  padding: 9px 12px;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  color: var(--bn-ink-soft);
+}
+.bellogue-nav a.active {
+  color: var(--bn-accent);
+  font-weight: 600;
+  border-bottom: 2px solid var(--bn-accent);
+  margin-bottom: -2px;
+}
+
+/* 일기/방명록 스프레드 (데스크탑: 나란히, 모바일: 탭으로 하나씩) */
+.bellogue-spread {
+  display: flex;
+  border: 0.5px solid var(--bn-border);
+  min-height: 220px;
+}
+.bellogue-page {
+  flex: 1;
+  padding: 18px 16px;
+  display: none;
+}
+.bellogue-page.bellogue-active {
+  display: block;
+}
+.bellogue-page + .bellogue-page {
+  border-left: 0.5px solid var(--bn-border);
+}
+
+@media (min-width: 640px) {
+  .bellogue-page {
+    display: block;
+  }
+}
+
+/* 주민센터 — 실제 게시판(bn-list/bn-row)과 동일한 스타일 */
+.bellogue-board-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.bellogue-write-btn {
+  font-family: 'Noto Serif KR', serif;
+  font-size: 12px;
+  border-radius: 2px;
+  padding: 7px 14px;
+  cursor: pointer;
+  background: var(--bn-accent);
+  color: var(--bn-paper);
+  font-weight: 600;
+  border: none;
+}
+.bellogue-board-list {
+  min-height: 40px;
+}
+.bellogue-board-row {
+  padding: 12px 2px;
+  font-size: 13.5px;
+  border-bottom: 0.5px solid var(--bn-line);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.bellogue-board-row:last-child {
+  border-bottom: none;
+}
+.bellogue-stamp {
+  font-size: 10px;
+  color: var(--bn-paper);
+  background: var(--bn-accent);
+  border-radius: 2px;
+  padding: 2px 7px;
+  margin-right: 10px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bellogue-row-title {
+  flex: 1;
+}
+.bellogue-meta {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--bn-muted);
+  white-space: nowrap;
+}
+
+.bellogue-placeholder {
+  font-size: 12.5px;
+  color: var(--bn-muted);
+  text-align: center;
+  margin-top: 60px;
 }
 
 @media (max-width: 480px) {
-  #bellogue-modal {
-    max-width: 300px;
-    height: 460px;
-  }
-  .bellogue-spine {
-    display: none;
+  .bellogue-inner {
+    padding: 18px 16px 22px;
   }
 }
