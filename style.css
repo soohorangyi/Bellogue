@@ -40,11 +40,12 @@ dialog#bellogue-dialog {
 dialog#bellogue-dialog.bellogue-open { width: 740px; }
 dialog#bellogue-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 
-.bellogue-frame { border: 2px solid var(--bn-accent); border-radius: 3px; overflow: hidden; height: 540px; }
+.bellogue-frame { border: 2px solid var(--bn-accent); border-radius: 3px; overflow: hidden; aspect-ratio: 2 / 3; }
+dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; height: 540px; }
 .bellogue-scroll { background: var(--bn-paper); color: var(--bn-ink); height: 100%; overflow-y: auto; display: flex; }
 
 /* 표지 */
-.bellogue-cover { width: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 0 24px; }
+.bellogue-cover { width: 100%; min-height: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 0 24px; }
 .bellogue-cover-icon { width: 46px; height: 46px; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 19px; }
 .bellogue-tagline { font-size: 10px; letter-spacing: 3px; color: var(--bn-muted); margin: 0 0 6px; }
 .bellogue-logo { font-size: 23px; font-weight: 600; letter-spacing: 1px; margin: 0 0 22px; }
@@ -53,9 +54,15 @@ dialog#bellogue-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 /* 내 벨로그 스프레드 */
 .bellogue-page { flex: 1; padding: 20px; overflow-y: auto; }
 .bellogue-profile-page { border-right: 0.5px solid var(--bn-border); }
+.bellogue-mobile-subtabs { display: none; }
 @media (max-width: 640px) {
   .bellogue-scroll { flex-direction: column; }
-  .bellogue-profile-page { border-right: none; border-bottom: 0.5px solid var(--bn-border); }
+  .bellogue-profile-page { border-right: none; }
+  .bellogue-mobile-subtabs { display: flex; border-bottom: 0.5px solid var(--bn-line); flex-shrink: 0; }
+  .bellogue-mobile-subtabs span { flex: 1; text-align: center; font-size: 12px; padding: 10px 0; color: var(--bn-ink-soft); cursor: pointer; }
+  .bellogue-mobile-subtabs span.active { color: var(--bn-accent); font-weight: 600; border-bottom: 2px solid var(--bn-accent); margin-bottom: -0.5px; }
+  .bellogue-page { display: none; padding: 16px; }
+  .bellogue-page.bellogue-mobile-active { display: block; }
 }
 
 /* 프로필 */
@@ -129,7 +136,6 @@ dialog#bellogue-dialog.bellogue-open .bellogue-index-tabs { display: flex; }
 
 @media (max-width: 480px) {
   dialog#bellogue-dialog { width: 92vw; }
-  dialog#bellogue-dialog.bellogue-open { width: 92vw; }
-  .bellogue-frame { height: 138vw; } /* 표지: 데스크탑과 동일한 2:3 비율 유지 */
-  dialog#bellogue-dialog.bellogue-open .bellogue-frame { height: 82dvh; } /* 펼친 상태: 탭 바뀌어도 항상 고정 */
+  dialog#bellogue-dialog.bellogue-open { width: 92vw; height: 82dvh; }
+  dialog#bellogue-dialog.bellogue-open .bellogue-frame { height: 100%; }
 }
