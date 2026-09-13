@@ -60,9 +60,9 @@ dialog#bellogue-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 
 /* 프로필 */
 .bellogue-avatar {
-  width: 100%; aspect-ratio: 4 / 5; border-radius: 3px; background: var(--bn-accent);
+  width: 65%; margin: 0 auto; aspect-ratio: 4 / 5; border-radius: 3px; background: var(--bn-accent);
   display: flex; align-items: center; justify-content: center; color: var(--bn-paper);
-  font-size: 34px; cursor: pointer; position: relative;
+  font-size: 26px; cursor: pointer; position: relative;
 }
 .bellogue-avatar-cam {
   position: absolute; bottom: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%;
@@ -109,6 +109,12 @@ dialog#bellogue-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 .bellogue-write-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .bellogue-btn-outline { font-family: inherit; font-size: 11.5px; border-radius: 2px; padding: 8px 16px; background: transparent; border: 0.5px solid var(--bn-border); cursor: pointer; color: var(--bn-ink); }
 .bellogue-btn-primary { font-family: inherit; font-size: 11.5px; border-radius: 2px; padding: 8px 16px; background: var(--bn-accent); color: var(--bn-paper); border: none; font-weight: 600; cursor: pointer; }
+
+/* 프로필 사진 크롭 */
+.bellogue-crop { width: 100%; padding: 4px 4px 0; text-align: center; }
+.bellogue-crop-frame { margin: 0 auto; position: relative; overflow: hidden; border-radius: 3px; border: 0.5px solid var(--bn-border); background: var(--bn-line); touch-action: none; cursor: grab; }
+.bellogue-crop-frame img { position: absolute; user-select: none; -webkit-user-drag: none; }
+.bellogue-crop-zoom { width: 80%; margin: 16px auto 0; display: block; }
 
 /* 주민센터 */
 .bellogue-board { width: 100%; padding: 4px; }
