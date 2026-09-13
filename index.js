@@ -305,20 +305,118 @@ function postHtml(post, manageMode) {
   `;
 }
 
+// ── 프로필 사진 크롭 ─────────────────────────────────────────
+function showAvatarCropper(dialog, srcDataUrl) {
+  const scroll = dialog.querySelector('#bellogue-scroll');
+  const FRAME_W = 260, FRAME_H = 325; // 4:5
+
+  scroll.innerHTML = `
+    <div class="bellogue-crop">
+      <p class="bellogue-back-link" id="bellogue-crop-cancel"><i class="fa-solid fa-arrow-left"></i> 취소</p>
+      <div class="bellogue-crop-frame" id="bellogue-crop-frame" style="width:${FRAME_W}px;height:${FRAME_H}px;">
+        <img id="bellogue-crop-img" src="${srcDataUrl}" draggable="false">
+      </div>
+      <input type="range" id="bellogue-crop-zoom" min="1" max="3" step="0.01" value="1" class="bellogue-crop-zoom">
+      <div class="bellogue-write-actions">
+        <button id="bellogue-crop-confirm" class="bellogue-btn-primary" type="button">확인</button>
+      </div>
+    </div>
+  `;
+
+  scroll.querySelector('#bellogue-crop-cancel').addEventListener('click', () => showTab(dialog, 'blog'));
+
+  const img = scroll.querySelector('#bellogue-crop-img');
+  const frame = scroll.querySelector('#bellogue-crop-frame');
+  const zoomInput = scroll.querySelector('#bellogue-crop-zoom');
+
+  let baseScale = 1, zoom = 1, offX = 0, offY = 0;
+  let dragging = false, startX = 0, startY = 0, startOffX = 0, startOffY = 0;
+
+  function clampOffsets() {
+    const dispW = img.naturalWidth * baseScale * zoom;
+    const dispH = img.naturalHeight * baseScale * zoom;
+    offX = Math.min(0, Math.max(FRAME_W - dispW, offX));
+    offY = Math.min(0, Math.max(FRAME_H - dispH, offY));
+  }
+  function render() {
+    clampOffsets();
+    const dispW = img.naturalWidth * baseScale * zoom;
+    const dispH = img.naturalHeight * baseScale * zoom;
+    img.style.width = dispW + 'px';
+    img.style.height = dispH + 'px';
+    img.style.left = offX + 'px';
+    img.style.top = offY + 'px';
+  }
+
+  img.onload = function () {
+    baseScale = Math.max(FRAME_W / img.naturalWidth, FRAME_H / img.naturalHeight);
+    offX = (FRAME_W - img.naturalWidth * baseScale) / 2;
+    offY = (FRAME_H - img.naturalHeight * baseScale) / 2;
+    render();
+  };
+  if (img.complete && img.naturalWidth) img.onload();
+
+  zoomInput.addEventListener('input', function () {
+    zoom = parseFloat(this.value);
+    render();
+  });
+
+  function pointerDown(e) {
+    dragging = true;
+    const p = e.touches ? e.touches[0] : e;
+    startX = p.clientX; startY = p.clientY;
+    startOffX = offX; startOffY = offY;
+  }
+  function pointerMove(e) {
+    if (!dragging) return;
+    const p = e.touches ? e.touches[0] : e;
+    offX = startOffX + (p.clientX - startX);
+    offY = startOffY + (p.clientY - startY);
+    render();
+    e.preventDefault();
+  }
+  function pointerUp() { dragging = false; }
+
+  frame.addEventListener('mousedown', pointerDown);
+  window.addEventListener('mousemove', pointerMove);
+  window.addEventListener('mouseup', pointerUp);
+  frame.addEventListener('touchstart', pointerDown, { passive: true });
+  frame.addEventListener('touchmove', pointerMove, { passive: false });
+  frame.addEventListener('touchend', pointerUp);
+
+  scroll.querySelector('#bellogue-crop-confirm').addEventListener('click', function () {
+    const scaleFactor = baseScale * zoom;
+    const sx = -offX / scaleFactor;
+    const sy = -offY / scaleFactor;
+    const sW = FRAME_W / scaleFactor;
+    const sH = FRAME_H / scaleFactor;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 400; canvas.height = 500;
+    canvas.getContext('2d').drawImage(img, sx, sy, sW, sH, 0, 0, 400, 500);
+
+    if (!dialog.open) dialog.showModal();
+    const s = getSettings();
+    s.profileImage = canvas.toDataURL('image/jpeg', 0.85);
+    saveSettingsDebounced();
+    showTab(dialog, 'blog');
+  });
+}
+
 function wireBlogEvents(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
 
   const avatar = scroll.querySelector('#bellogue-avatar');
   const fileInput = scroll.querySelector('#bellogue-avatar-input');
   avatar.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', async function () {
+  fileInput.addEventListener('change', function () {
     const file = this.files[0];
     if (!file) return;
-    const dataUrl = await resizeImageFile(file, 400, 500);
-    const s = getSettings();
-    s.profileImage = dataUrl;
-    saveSettingsDebounced();
-    showTab(dialog, 'blog');
+    // 모바일에서 OS 사진 선택창 때문에 dialog가 백그라운드 처리되어 닫히는 경우 대비
+    if (!dialog.open) dialog.showModal();
+    const reader = new FileReader();
+    reader.onload = () => showAvatarCropper(dialog, reader.result);
+    reader.readAsDataURL(file);
   });
 
   scroll.querySelector('#bellogue-manage-btn').addEventListener('click', function () {
