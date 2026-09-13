@@ -127,6 +127,7 @@ jQuery(async () => {
 function openBellogueModal() {
   let dialog = document.getElementById('bellogue-dialog');
   if (!dialog) dialog = buildBellogueDialog();
+  showCover(dialog);
   dialog.showModal();
 }
 
@@ -135,21 +136,87 @@ function buildBellogueDialog() {
   dialog.id = 'bellogue-dialog';
   dialog.className = 'bellogue-dialog';
   dialog.innerHTML = `
-    <div class="bellogue-inner">
+    <div class="bellogue-frame">
+      <div class="bellogue-scroll" id="bellogue-scroll"></div>
+    </div>
+    <div class="bellogue-index-tabs" id="bellogue-index-tabs"></div>
+  `;
+  document.body.appendChild(dialog);
 
-      <div class="bellogue-masthead">
-        <i id="bellogue-close" class="fa-solid fa-xmark"></i>
-        <p class="bellogue-tagline">ARS IN NOCTE</p>
-        <p class="bellogue-logo">BELLOGUE</p>
+  // 뒷배경(backdrop) 클릭하면 닫기
+  dialog.addEventListener('click', function (e) {
+    const rect = dialog.getBoundingClientRect();
+    const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+    if (!inside) dialog.close();
+  });
+  // 다음에 열 때는 항상 표지부터 다시 보이게
+  dialog.addEventListener('close', function () {
+    showCover(dialog);
+  });
+
+  return dialog;
+}
+
+const BELLOGUE_TABS = [
+  { id: 'diary', label: '일기' },
+  { id: 'guestbook', label: '방명록' },
+  { id: 'board', label: '주민센터' },
+];
+
+function showCover(dialog) {
+  const scroll = dialog.querySelector('#bellogue-scroll');
+  const tabsBox = dialog.querySelector('#bellogue-index-tabs');
+  tabsBox.innerHTML = '';
+
+  scroll.innerHTML = `
+    <div class="bellogue-cover">
+      <div class="bellogue-cover-icon"><i class="fa-solid fa-moon"></i></div>
+      <p class="bellogue-tagline">ARS IN NOCTE</p>
+      <p class="bellogue-logo">BELLOGUE</p>
+      <button id="bellogue-open-btn" class="bellogue-open-btn">OPEN</button>
+    </div>
+  `;
+
+  scroll.querySelector('#bellogue-open-btn').addEventListener('click', function () {
+    showBellogueTab(dialog, 'diary');
+  });
+}
+
+function showBellogueTab(dialog, name) {
+  const scroll = dialog.querySelector('#bellogue-scroll');
+  const tabsBox = dialog.querySelector('#bellogue-index-tabs');
+
+  tabsBox.innerHTML = BELLOGUE_TABS.map(function (t) {
+    return `<div class="bellogue-index-tab${t.id === name ? ' active' : ''}" data-tab="${t.id}">${t.label}</div>`;
+  }).join('');
+  tabsBox.querySelectorAll('.bellogue-index-tab').forEach(function (el) {
+    el.addEventListener('click', function () {
+      showBellogueTab(dialog, el.dataset.tab);
+    });
+  });
+
+  const masthead = `
+    <div class="bellogue-masthead">
+      <i id="bellogue-close" class="fa-solid fa-xmark"></i>
+      <p class="bellogue-tagline">ARS IN NOCTE</p>
+      <p class="bellogue-logo">BELLOGUE</p>
+    </div>
+  `;
+
+  if (name === 'board') {
+    scroll.innerHTML = masthead + `
+      <div class="bellogue-board">
+        <div class="bellogue-board-header">
+          <button class="bellogue-write-btn">글쓰기</button>
+        </div>
+        <div class="bellogue-board-list">
+          <p class="bellogue-placeholder">주민센터 (준비 중)</p>
+        </div>
       </div>
-
-      <nav class="bellogue-nav">
-        <a data-tab="diary">일기</a>
-        <a data-tab="guestbook">방명록</a>
-        <a data-tab="board">주민센터</a>
-      </nav>
-
-      <div class="bellogue-spread" id="bellogue-spread">
+    `;
+  } else {
+    scroll.innerHTML = masthead + `
+      <div class="bellogue-spread">
         <div class="bellogue-page bellogue-active" id="bellogue-page-diary">
           <p class="bellogue-placeholder">일기 페이지 (준비 중)</p>
         </div>
@@ -157,52 +224,10 @@ function buildBellogueDialog() {
           <p class="bellogue-placeholder">방명록 페이지 (준비 중)</p>
         </div>
       </div>
-
-      <div class="bellogue-board" id="bellogue-board" style="display:none;">
-        <p class="bellogue-placeholder">주민센터 (준비 중)</p>
-      </div>
-
-    </div>
-  `;
-  document.body.appendChild(dialog);
-
-  // 바깥(backdrop) 클릭하면 닫기
-  dialog.addEventListener('click', function (e) {
-    const rect = dialog.getBoundingClientRect();
-    const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-    if (!inside) dialog.close();
-  });
-  dialog.querySelector('#bellogue-close').addEventListener('click', () => dialog.close());
-
-  dialog.querySelectorAll('.bellogue-nav a').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      showBellogueTab(tab.dataset.tab);
-    });
-  });
-
-  showBellogueTab('diary');
-  return dialog;
-}
-
-function showBellogueTab(name) {
-  const dialog = document.getElementById('bellogue-dialog');
-  if (!dialog) return;
-
-  dialog.querySelectorAll('.bellogue-nav a').forEach(function (t) {
-    t.classList.toggle('active', t.dataset.tab === name);
-  });
-
-  const spread = dialog.querySelector('#bellogue-spread');
-  const board = dialog.querySelector('#bellogue-board');
-
-  if (name === 'board') {
-    spread.style.display = 'none';
-    board.style.display = 'block';
-    return;
+    `;
+    scroll.querySelector('#bellogue-page-diary').classList.toggle('bellogue-active', name === 'diary');
+    scroll.querySelector('#bellogue-page-guestbook').classList.toggle('bellogue-active', name === 'guestbook');
   }
 
-  spread.style.display = 'flex';
-  board.style.display = 'none';
-  dialog.querySelector('#bellogue-page-diary').classList.toggle('bellogue-active', name === 'diary');
-  dialog.querySelector('#bellogue-page-guestbook').classList.toggle('bellogue-active', name === 'guestbook');
+  scroll.querySelector('#bellogue-close').addEventListener('click', () => dialog.close());
 }
