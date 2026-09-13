@@ -125,68 +125,84 @@ jQuery(async () => {
 });
 
 function openBellogueModal() {
-  if (document.getElementById('bellogue-overlay')) return;
+  let dialog = document.getElementById('bellogue-dialog');
+  if (!dialog) dialog = buildBellogueDialog();
+  dialog.showModal();
+}
 
-  const overlay = document.createElement('div');
-  overlay.id = 'bellogue-overlay';
-  overlay.innerHTML = `
-    <div id="bellogue-modal">
+function buildBellogueDialog() {
+  const dialog = document.createElement('dialog');
+  dialog.id = 'bellogue-dialog';
+  dialog.className = 'bellogue-dialog';
+  dialog.innerHTML = `
+    <div class="bellogue-inner">
 
-      <div id="bellogue-page-left" class="bellogue-page">
-        <div class="bellogue-page-header">
-          <span class="bellogue-title">Bellogue</span>
-          <i id="bellogue-close" class="fa-solid fa-xmark"></i>
-        </div>
-        <div class="bellogue-page-body" id="bellogue-content-diary">
+      <div class="bellogue-masthead">
+        <i id="bellogue-close" class="fa-solid fa-xmark"></i>
+        <p class="bellogue-tagline">ARS IN NOCTE</p>
+        <p class="bellogue-logo">BELLOGUE</p>
+      </div>
+
+      <nav class="bellogue-nav">
+        <a data-tab="diary">일기</a>
+        <a data-tab="guestbook">방명록</a>
+        <a data-tab="board">주민센터</a>
+      </nav>
+
+      <div class="bellogue-spread" id="bellogue-spread">
+        <div class="bellogue-page bellogue-active" id="bellogue-page-diary">
           <p class="bellogue-placeholder">일기 페이지 (준비 중)</p>
         </div>
-      </div>
-
-      <div class="bellogue-spine">
-        <span></span><span></span><span></span>
-      </div>
-
-      <div id="bellogue-page-right" class="bellogue-page">
-        <div class="bellogue-page-body" id="bellogue-content-guestbook">
+        <div class="bellogue-page" id="bellogue-page-guestbook">
           <p class="bellogue-placeholder">방명록 페이지 (준비 중)</p>
         </div>
-        <div class="bellogue-tab bellogue-tab-guestbook" data-tab="guestbook">방명록</div>
-        <div class="bellogue-tab bellogue-tab-diary" data-tab="diary">일기</div>
+      </div>
+
+      <div class="bellogue-board" id="bellogue-board" style="display:none;">
+        <p class="bellogue-placeholder">주민센터 (준비 중)</p>
       </div>
 
     </div>
   `;
-  document.body.appendChild(overlay);
+  document.body.appendChild(dialog);
 
-  overlay.addEventListener('click', function (e) {
-    if (e.target === overlay) closeBellogueModal();
+  // 바깥(backdrop) 클릭하면 닫기
+  dialog.addEventListener('click', function (e) {
+    const rect = dialog.getBoundingClientRect();
+    const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+    if (!inside) dialog.close();
   });
-  document.getElementById('bellogue-close').addEventListener('click', closeBellogueModal);
+  dialog.querySelector('#bellogue-close').addEventListener('click', () => dialog.close());
 
-  overlay.querySelectorAll('.bellogue-tab').forEach(function (tab) {
+  dialog.querySelectorAll('.bellogue-nav a').forEach(function (tab) {
     tab.addEventListener('click', function () {
-      showBellogueTab(tab.getAttribute('data-tab'));
+      showBellogueTab(tab.dataset.tab);
     });
   });
 
   showBellogueTab('diary');
+  return dialog;
 }
 
 function showBellogueTab(name) {
-  const overlay = document.getElementById('bellogue-overlay');
-  if (!overlay) return;
+  const dialog = document.getElementById('bellogue-dialog');
+  if (!dialog) return;
 
-  overlay.querySelectorAll('.bellogue-tab').forEach(function (t) {
+  dialog.querySelectorAll('.bellogue-nav a').forEach(function (t) {
     t.classList.toggle('active', t.dataset.tab === name);
   });
 
-  if (window.innerWidth <= 480) {
-    document.getElementById('bellogue-page-left').style.display = name === 'diary' ? 'flex' : 'none';
-    document.getElementById('bellogue-page-right').style.display = name === 'guestbook' ? 'flex' : 'none';
-  }
-}
+  const spread = dialog.querySelector('#bellogue-spread');
+  const board = dialog.querySelector('#bellogue-board');
 
-function closeBellogueModal() {
-  const overlay = document.getElementById('bellogue-overlay');
-  if (overlay) overlay.remove();
+  if (name === 'board') {
+    spread.style.display = 'none';
+    board.style.display = 'block';
+    return;
+  }
+
+  spread.style.display = 'flex';
+  board.style.display = 'none';
+  dialog.querySelector('#bellogue-page-diary').classList.toggle('bellogue-active', name === 'diary');
+  dialog.querySelector('#bellogue-page-guestbook').classList.toggle('bellogue-active', name === 'guestbook');
 }
