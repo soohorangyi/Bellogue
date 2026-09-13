@@ -7,6 +7,7 @@
   --bn-muted: #8A8477;
   --bn-line: #E5DED2;
   --bn-border: #35322C;
+  --bn-cover: #3A2E28;
   --bn-accent: #6B4444;
   --bn-accent-tint: rgba(107, 68, 68, 0.14);
 }
@@ -54,35 +55,75 @@
 /* ── 모달 (dialog 요소 — top layer라 ST 쪽 transform에 영향 안 받음) ── */
 dialog#bellogue-dialog {
   font-family: 'Noto Serif KR', serif;
-  color: var(--bn-ink);
-  background: var(--bn-paper);
-  border: 0.5px solid var(--bn-border);
-  border-radius: 2px;
-  padding: 0;
-  width: min(640px, 94vw);
-  max-width: 640px;
-  max-height: 90dvh;
-  overflow-y: auto;
+  background: var(--bn-cover);
+  border: none;
+  border-radius: 8px;
+  padding: 16px;
+  width: min(380px, 92vw);
+  max-width: 380px;
+  max-height: none;
+  overflow: visible; /* 인덱스 탭이 바깥으로 튀어나오게 */
 }
 dialog#bellogue-dialog::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
 
-.bellogue-inner {
-  padding: 24px 22px 28px;
+/* 가죽 커버 안쪽 금박 느낌 테두리 */
+.bellogue-frame {
+  border: 2px solid var(--bn-accent);
+  border-radius: 3px;
+  overflow: hidden;
 }
 
-/* 마스트헤드 */
+.bellogue-scroll {
+  background: var(--bn-paper);
+  color: var(--bn-ink);
+  max-height: min(72vh, 72dvh);
+  overflow-y: auto;
+}
+
+/* ── 표지 화면 ── */
+.bellogue-cover {
+  text-align: center;
+  padding: 38px 24px 30px;
+}
+.bellogue-cover-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--bn-accent);
+  color: var(--bn-paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  font-size: 17px;
+}
+.bellogue-open-btn {
+  margin-top: 24px;
+  font-family: 'Noto Serif KR', serif;
+  font-size: 12.5px;
+  letter-spacing: 2px;
+  border-radius: 2px;
+  padding: 9px 26px;
+  cursor: pointer;
+  background: var(--bn-accent);
+  color: var(--bn-paper);
+  font-weight: 600;
+  border: none;
+}
+
+/* 마스트헤드 (펼친 화면 공통 헤더) */
 .bellogue-masthead {
   text-align: center;
   position: relative;
-  margin-bottom: 12px;
+  padding: 16px 16px 0;
 }
 .bellogue-masthead #bellogue-close {
   position: absolute;
-  right: 0;
-  top: 2px;
-  font-size: 15px;
+  right: 16px;
+  top: 14px;
+  font-size: 14px;
   color: var(--bn-ink-soft);
   cursor: pointer;
 }
@@ -93,37 +134,17 @@ dialog#bellogue-dialog::backdrop {
   margin: 0 0 5px;
 }
 .bellogue-logo {
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: 1px;
-  margin: 0;
+  margin: 0 0 12px;
 }
 
-/* 탭 내비게이션 */
-.bellogue-nav {
-  display: flex;
-  border-bottom: 0.5px solid var(--bn-line);
-  margin-bottom: 16px;
-}
-.bellogue-nav a {
-  font-size: 12.5px;
-  padding: 9px 12px;
-  letter-spacing: 0.3px;
-  cursor: pointer;
-  color: var(--bn-ink-soft);
-}
-.bellogue-nav a.active {
-  color: var(--bn-accent);
-  font-weight: 600;
-  border-bottom: 2px solid var(--bn-accent);
-  margin-bottom: -2px;
-}
-
-/* 일기/방명록 스프레드 (데스크탑: 나란히, 모바일: 탭으로 하나씩) */
+/* 일기/방명록 스프레드 */
 .bellogue-spread {
   display: flex;
-  border: 0.5px solid var(--bn-border);
-  min-height: 220px;
+  border-top: 0.5px solid var(--bn-border);
+  min-height: 200px;
 }
 .bellogue-page {
   flex: 1;
@@ -136,7 +157,6 @@ dialog#bellogue-dialog::backdrop {
 .bellogue-page + .bellogue-page {
   border-left: 0.5px solid var(--bn-border);
 }
-
 @media (min-width: 640px) {
   .bellogue-page {
     display: block;
@@ -144,6 +164,10 @@ dialog#bellogue-dialog::backdrop {
 }
 
 /* 주민센터 — 실제 게시판(bn-list/bn-row)과 동일한 스타일 */
+.bellogue-board {
+  border-top: 0.5px solid var(--bn-border);
+  padding: 16px;
+}
 .bellogue-board-header {
   display: flex;
   justify-content: flex-end;
@@ -160,9 +184,6 @@ dialog#bellogue-dialog::backdrop {
   font-weight: 600;
   border: none;
 }
-.bellogue-board-list {
-  min-height: 40px;
-}
 .bellogue-board-row {
   padding: 12px 2px;
   font-size: 13.5px;
@@ -171,9 +192,6 @@ dialog#bellogue-dialog::backdrop {
   align-items: center;
   cursor: pointer;
 }
-.bellogue-board-row:last-child {
-  border-bottom: none;
-}
 .bellogue-stamp {
   font-size: 10px;
   color: var(--bn-paper);
@@ -181,12 +199,8 @@ dialog#bellogue-dialog::backdrop {
   border-radius: 2px;
   padding: 2px 7px;
   margin-right: 10px;
-  letter-spacing: 0.5px;
   font-weight: 600;
   white-space: nowrap;
-}
-.bellogue-row-title {
-  flex: 1;
 }
 .bellogue-meta {
   margin-left: auto;
@@ -202,8 +216,30 @@ dialog#bellogue-dialog::backdrop {
   margin-top: 60px;
 }
 
+/* ── 다이어리 인덱스 탭 (오른쪽으로 튀어나오는 형태) ── */
+.bellogue-index-tabs {
+  position: absolute;
+  top: 70px;
+  right: -6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bellogue-index-tab {
+  font-size: 10px;
+  color: var(--bn-paper);
+  padding: 12px 4px;
+  border-radius: 0 4px 4px 0;
+  writing-mode: vertical-rl;
+  cursor: pointer;
+  background: #5A4A40;
+}
+.bellogue-index-tab.active {
+  background: var(--bn-accent);
+}
+
 @media (max-width: 480px) {
-  .bellogue-inner {
-    padding: 18px 16px 22px;
+  .bellogue-cover {
+    padding: 30px 18px 24px;
   }
 }
