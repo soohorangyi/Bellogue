@@ -95,25 +95,34 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-post-row { display: flex; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 0.5px solid var(--bn-line); cursor: pointer; }
 .bellogue-row-thumb { width: 40px; height: 40px; flex-shrink: 0; border-radius: 2px; background-color: var(--bn-line); background-size: cover; background-position: center; }
 .bellogue-row-main { flex: 1; min-width: 0; }
+.bellogue-post-title { margin: 0; font-size: 13px; font-weight: 600; }
+.bellogue-meta { font-size: 10px; color: var(--bn-muted); white-space: nowrap; }
 .bellogue-row-main .bellogue-post-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bellogue-row-main .bellogue-meta { display: block; margin-top: 2px; }
 .bellogue-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* 글 상세보기 */
 .bellogue-post { padding: 20px; }
-.bellogue-post-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 14px; }
-.bellogue-post-title { margin: 0; font-size: 13px; font-weight: 600; }
-.bellogue-post-head-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.bellogue-meta { font-size: 10px; color: var(--bn-muted); white-space: nowrap; }
+.bellogue-post-headrow { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+.bellogue-meta-badge { font-size: 9.5px; color: var(--bn-paper); background: var(--bn-accent); border-radius: 2px; padding: 3px 8px; font-weight: 600; letter-spacing: 0.5px; }
 .bellogue-post-edit, .bellogue-post-delete, .bellogue-comment-delete {
-  font-size: 10px; border-radius: 2px; padding: 2px 6px; cursor: pointer; white-space: nowrap;
+  font-size: 10px; border-radius: 2px; padding: 2px 6px; cursor: pointer; white-space: nowrap; margin-left: 6px;
 }
 .bellogue-post-edit { border: 0.5px solid var(--bn-border); color: var(--bn-ink-soft); }
 .bellogue-post-delete, .bellogue-comment-delete { border: 0.5px solid var(--bn-danger); color: var(--bn-danger); }
-.bellogue-post-image { width: 100%; height: 140px; background-color: var(--bn-line); background-size: cover; background-position: center; border-radius: 2px; margin: 10px 0; }
-.bellogue-post-body { font-size: 11.5px; color: var(--bn-ink-soft); line-height: 1.7; margin: 6px 0 8px; }
-.bellogue-comment-row { padding: 6px 0; border-top: 0.5px solid #EFE9DC; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.bellogue-comment-row p { margin: 0; font-size: 10.5px; }
+.bellogue-post-title-lg { font-size: 20px; font-weight: 700; line-height: 1.35; margin: 12px 0 6px; }
+.bellogue-post-subtitle { font-family: 'Noto Sans KR', sans-serif; font-size: 10.5px; color: var(--bn-muted); margin: 0 0 18px; }
+.bellogue-post-image { width: 100%; aspect-ratio: 4 / 3; background-color: var(--bn-line); background-size: cover; background-position: center; border-radius: 2px; margin-bottom: 20px; }
+.bellogue-post-body { font-size: 13px; line-height: 2; color: var(--bn-ink); }
+.bellogue-post-para { margin: 0 0 14px; }
+.bellogue-post-para:last-child { margin-bottom: 0; }
+.bellogue-dropcap::first-letter { float: left; font-size: 34px; line-height: 0.8; font-weight: 700; color: var(--bn-accent); padding: 4px 6px 0 0; }
+.bellogue-section-tag { display: inline-block; font-size: 10px; color: var(--bn-paper); background: var(--bn-accent); border-radius: 2px; padding: 2px 8px; font-weight: 600; letter-spacing: 0.5px; margin: 26px 0 10px; }
+.bellogue-comments-box { border: 0.5px solid var(--bn-line); border-radius: 3px; padding: 4px 14px; background: rgba(107,68,68,0.03); }
+.bellogue-comments-box .bellogue-section-tag { margin-top: 12px; }
+.bellogue-comment-row { padding: 8px 0; border-top: 0.5px solid #EFE9DC; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bellogue-comment-row:first-of-type { border-top: none; }
+.bellogue-comment-row p { margin: 0; font-size: 11px; }
 .bellogue-comment-name { font-weight: 600; color: var(--bn-accent); }
 
 /* 글쓰기 */
