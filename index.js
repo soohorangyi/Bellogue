@@ -41,6 +41,33 @@ const NEIGHBOR_SEED = [
   },
 ];
 
+const DISCOVER_SEED = [
+  {
+    id: 'nb_theo', name: '테오', emoji: '🔧',
+    job: '자동차 정비공', district: '항구 지구', zodiac: '양자리', birthday: '4월 9일',
+    intro: '기름때는 훈장 같은 거예요.',
+    posts: [{ id: 'nbp_theo_1', title: '엔진 소리로 다 알아요', date: '9월 9일', body: '오늘도 낡은 차 한 대를 고쳤다. 엔진 소리만 들어도 어디가 아픈지 대충 감이 온다.', image: '', comments: [] }],
+  },
+  {
+    id: 'nb_betty', name: '베티', emoji: '☕',
+    job: '카페 종업원', district: '대성당 지구', zodiac: '게자리', birthday: '7월 1일',
+    intro: '단골손님 얼굴은 다 외워요.',
+    posts: [{ id: 'nbp_betty_1', title: '오늘의 단골', date: '9월 8일', body: '항상 같은 자리에 앉는 손님이 오늘은 안 왔다. 별일 없어야 할 텐데.', image: '', comments: [] }],
+  },
+  {
+    id: 'nb_clara', name: '클라라', emoji: '🎹',
+    job: '피아노 교습소 선생', district: '구시가', zodiac: '물병자리', birthday: '2월 8일',
+    intro: '음악이 없는 밤은 상상할 수 없어요.',
+    posts: [{ id: 'nbp_clara_1', title: '새 제자가 왔다', date: '9월 7일', body: '손가락이 짧아 걱정하던 아이였는데, 생각보다 재능이 있는 것 같다.', image: '', comments: [] }],
+  },
+  {
+    id: 'nb_eden', name: '이든', emoji: '📰',
+    job: '신문팔이 소년', district: '구시가', zodiac: '쌍둥이자리', birthday: '6월 20일',
+    intro: '오늘의 특종이 궁금하면 저를 찾으세요.',
+    posts: [{ id: 'nbp_eden_1', title: '오늘 신문 다 팔았다', date: '9월 6일', body: '해 지기 전에 다 팔아서 기분이 좋다. 내일은 더 일찍 나가봐야지.', image: '', comments: [] }],
+  },
+];
+
 const defaultSettings = {
   nickname: "",
   colorTheme: "burgundy",
@@ -188,6 +215,7 @@ function openBellogueModal() {
   dialog._manageMode = false;
   dialog._mobileSub = 'profile';
   dialog._neighborView = null;
+  dialog._neighborMobileSub = 'friends';
   showCover(dialog);
   dialog.showModal();
 }
@@ -644,11 +672,14 @@ function neighborTabHtml(dialog) {
     const neighbor = s.neighbors.find(n => n.id === viewId);
     if (neighbor) return neighborVisitHtml(neighbor);
   }
-  return neighborListHtml(s.neighbors);
+  return neighborListHtml(dialog, s.neighbors);
 }
 
-function neighborListHtml(neighbors) {
-  const rows = neighbors.map(n => `
+function neighborListHtml(dialog, neighbors) {
+  const sub = dialog._neighborMobileSub || 'friends';
+  const discoverList = DISCOVER_SEED.filter(d => !neighbors.find(n => n.id === d.id));
+
+  const friendRows = neighbors.map(n => `
     <div class="bellogue-neighbor-row" data-id="${n.id}">
       <div class="bellogue-neighbor-emoji">${n.emoji || '🌙'}</div>
       <div class="bellogue-row-main">
@@ -657,13 +688,31 @@ function neighborListHtml(neighbors) {
       </div>
       <span class="bellogue-friend-badge">✓ 이웃</span>
     </div>
-  `).join('');
-  return `
-    <div class="bellogue-post" style="padding:20px;">
-      <div class="bellogue-feed-header" style="justify-content:flex-start; margin-top:2px;">
-        <span class="bellogue-section-tag" style="margin:0;">🏘 내 이웃</span>
+  `).join('') || `<p class="bellogue-placeholder-sm">아직 이웃이 없어요</p>`;
+
+  const discoverRows = discoverList.map(n => `
+    <div class="bellogue-neighbor-row">
+      <div class="bellogue-neighbor-emoji">${n.emoji}</div>
+      <div class="bellogue-row-main">
+        <p class="bellogue-post-title">${escapeHtml(n.name)}</p>
+        <span class="bellogue-meta">${escapeHtml(n.job)} · ${escapeHtml(n.district)}</span>
       </div>
-      <div class="bellogue-post-list">${rows}</div>
+      <span class="bellogue-add-friend-btn" data-id="${n.id}">+ 이웃맺기</span>
+    </div>
+  `).join('') || `<p class="bellogue-placeholder-sm">더 이상 추천할 이웃이 없어요</p>`;
+
+  return `
+    <div class="bellogue-mobile-subtabs">
+      <span data-sub="friends" class="${sub === 'friends' ? 'active' : ''}">내 이웃</span>
+      <span data-sub="discover" class="${sub === 'discover' ? 'active' : ''}">발견</span>
+    </div>
+    <div class="bellogue-page bellogue-profile-page${sub === 'friends' ? ' bellogue-mobile-active' : ''}">
+      <span class="bellogue-section-tag" style="margin:0 0 10px;">🏘 내 이웃</span>
+      <div class="bellogue-post-list">${friendRows}</div>
+    </div>
+    <div class="bellogue-page bellogue-feed-page${sub === 'discover' ? ' bellogue-mobile-active' : ''}">
+      <span class="bellogue-section-tag bellogue-section-tag-alt" style="margin:0 0 10px;">✨ 발견</span>
+      <div class="bellogue-post-list">${discoverRows}</div>
     </div>
   `;
 }
@@ -715,9 +764,31 @@ function neighborVisitHtml(neighbor) {
 function wireNeighborEvents(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
 
-  scroll.querySelectorAll('.bellogue-neighbor-row').forEach(row => {
-    row.addEventListener('click', function () {
+  scroll.querySelectorAll('.bellogue-mobile-subtabs span').forEach(el => {
+    el.addEventListener('click', function () {
+      dialog._neighborMobileSub = this.dataset.sub;
+      showTab(dialog, 'neighbor');
+    });
+  });
+
+  scroll.querySelectorAll('.bellogue-neighbor-row[data-id]').forEach(row => {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('.bellogue-add-friend-btn')) return;
       dialog._neighborView = this.dataset.id;
+      showTab(dialog, 'neighbor');
+    });
+  });
+
+  scroll.querySelectorAll('.bellogue-add-friend-btn').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const npc = DISCOVER_SEED.find(n => n.id === this.dataset.id);
+      if (!npc) return;
+      const s = getSettings();
+      if (!s.neighbors.find(n => n.id === npc.id)) {
+        s.neighbors.push(JSON.parse(JSON.stringify(npc)));
+        saveSettingsDebounced();
+      }
       showTab(dialog, 'neighbor');
     });
   });
