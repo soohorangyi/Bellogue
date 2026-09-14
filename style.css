@@ -116,7 +116,7 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-post-body { font-size: 13px; line-height: 2; color: var(--bn-ink); }
 .bellogue-post-para { margin: 0 0 14px; }
 .bellogue-post-para:last-child { margin-bottom: 0; }
-.bellogue-dropcap::first-letter { float: left; font-size: 34px; line-height: 0.8; font-weight: 700; color: var(--bn-accent); padding: 4px 6px 0 0; }
+.bellogue-dropcap::first-letter { float: left; font-size: 26px; line-height: 0.85; font-weight: 700; color: var(--bn-accent); padding: 2px 5px 0 0; }
 .bellogue-section-tag { display: inline-block; font-size: 10px; color: var(--bn-paper); background: var(--bn-accent); border-radius: 2px; padding: 2px 8px; font-weight: 600; letter-spacing: 0.5px; margin: 26px 0 10px; }
 .bellogue-comments-box { border: 0.5px solid var(--bn-line); border-radius: 3px; padding: 4px 14px; background: rgba(107,68,68,0.03); }
 .bellogue-comments-box .bellogue-section-tag { margin-top: 12px; }
