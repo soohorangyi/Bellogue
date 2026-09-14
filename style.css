@@ -164,8 +164,10 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-comment-input { flex: 1; box-sizing: border-box; border: 0.5px solid var(--bn-line); border-radius: 2px; font-family: inherit; font-size: 11.5px; padding: 7px 9px; color: var(--bn-ink); background: var(--bn-paper); }
 
 /* 주민센터 */
-.bellogue-board { width: 100%; padding: 4px; }
-.bellogue-board-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.bellogue-board { width: 100%; box-sizing: border-box; padding: 20px; }
+.bellogue-board-row { display: flex; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 0.5px solid var(--bn-line); cursor: pointer; }
+.bellogue-stamp { font-size: 10px; color: var(--bn-paper); background: var(--bn-accent); border-radius: 2px; padding: 2px 7px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.bellogue-row-title { flex: 1; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bellogue-placeholder { font-size: 12.5px; color: var(--bn-muted); text-align: center; margin-top: 60px; }
 
 /* 다이어리 인덱스 탭 */
