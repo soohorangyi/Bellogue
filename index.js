@@ -1,6 +1,6 @@
 // Bellogue — 개인 다이어리 확장프로그램
 
-import { extension_settings } from "../../../extensions.js";
+import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 
 const extensionName = "bellogue";
@@ -81,6 +81,7 @@ const defaultSettings = {
   profileImage: "",   // base64 data URL
   posts: [],          // [{ id, title, body, image, date, comments:[{id,name,text}] }]
   neighbors: [],       // [{ id, name, emoji, job, district, zodiac, birthday, intro, posts:[...] }]
+  neighborFeed: [],     // [{ neighborId, postId }] 최신순, 최대 5개
   neighborSeedVersion: 0,
 };
 
@@ -123,6 +124,41 @@ function ensureNeighborSeeded() {
   s.neighbors = JSON.parse(JSON.stringify(NEIGHBOR_SEED));
   s.neighborSeedVersion = NEIGHBOR_SEED_VERSION;
   saveSettingsDebounced();
+}
+
+// "새 글 보기" — 내 이웃 중 한 명을 골라 AI로 새 일기를 생성, 최근 5개 피드에 반영
+async function generateNeighborFeedPost() {
+  const s = getSettings();
+  if (s.neighbors.length === 0) return { ok: false };
+  const neighbor = s.neighbors[Math.floor(Math.random() * s.neighbors.length)];
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = `당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${neighbor.name}"입니다. 직업은 ${neighbor.job}, 거주구역은 ${neighbor.district}입니다. 오늘 새로 쓴 짧은 일기를 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"title":"제목","body":"본문 (2~3문장, 1인칭)"}
+${langLine}`;
+
+  try {
+    const context = getContext();
+    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON in response');
+    const data = JSON.parse(match[0]);
+    const post = {
+      id: 'nbp_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      title: data.title || '오늘 하루',
+      body: data.body || '별일 없이 지나간 하루였다.',
+      image: '', date: todayStr(), comments: [],
+    };
+    const s2 = getSettings();
+    const n2 = s2.neighbors.find(n => n.id === neighbor.id);
+    n2.posts.unshift(post);
+    s2.neighborFeed.unshift({ neighborId: neighbor.id, postId: post.id });
+    if (s2.neighborFeed.length > 5) s2.neighborFeed.length = 5;
+    saveSettingsDebounced();
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 이웃 새 글 생성 실패:', e);
+    return { ok: false };
+  }
 }
 
 // ── 확장프로그램 관리 탭 설정 패널 ──────────────────────────────
@@ -667,10 +703,10 @@ function showWrite(dialog, editingId, draft) {
 function neighborTabHtml(dialog) {
   ensureNeighborSeeded();
   const s = getSettings();
-  const viewId = dialog._neighborView;
-  if (viewId) {
-    const neighbor = s.neighbors.find(n => n.id === viewId);
-    if (neighbor) return neighborVisitHtml(neighbor);
+  const view = dialog._neighborView;
+  if (view) {
+    const neighbor = s.neighbors.find(n => n.id === view.id);
+    if (neighbor) return neighborVisitHtml(neighbor, view.postId);
   }
   return neighborListHtml(dialog, s.neighbors);
 }
@@ -678,6 +714,7 @@ function neighborTabHtml(dialog) {
 function neighborListHtml(dialog, neighbors) {
   const sub = dialog._neighborMobileSub || 'friends';
   const discoverList = DISCOVER_SEED.filter(d => !neighbors.find(n => n.id === d.id));
+  const s = getSettings();
 
   const friendRows = neighbors.map(n => `
     <div class="bellogue-neighbor-row" data-id="${n.id}">
@@ -689,6 +726,21 @@ function neighborListHtml(dialog, neighbors) {
       <span class="bellogue-friend-badge">✓ 이웃</span>
     </div>
   `).join('') || `<p class="bellogue-placeholder-sm">아직 이웃이 없어요</p>`;
+
+  const feedRows = s.neighborFeed.map(ref => {
+    const n = neighbors.find(x => x.id === ref.neighborId);
+    if (!n) return '';
+    const p = n.posts.find(x => x.id === ref.postId);
+    if (!p) return '';
+    return `
+      <div class="bellogue-neighbor-row" data-feed-neighbor="${n.id}" data-feed-post="${p.id}">
+        <div class="bellogue-neighbor-emoji">${n.emoji || '🌙'}</div>
+        <div class="bellogue-row-main">
+          <p class="bellogue-post-title">${escapeHtml(n.name)} · ${escapeHtml(p.title)}</p>
+          <span class="bellogue-meta">${escapeHtml(p.date)}</span>
+        </div>
+      </div>`;
+  }).join('') || `<p class="bellogue-placeholder-sm">새 글 보기를 눌러보세요</p>`;
 
   const discoverRows = discoverList.map(n => `
     <div class="bellogue-neighbor-row">
@@ -709,6 +761,12 @@ function neighborListHtml(dialog, neighbors) {
     <div class="bellogue-page bellogue-profile-page${sub === 'friends' ? ' bellogue-mobile-active' : ''}">
       <span class="bellogue-section-tag" style="margin:0 0 10px;">🏘 내 이웃</span>
       <div class="bellogue-post-list">${friendRows}</div>
+
+      <div class="bellogue-feed-header" style="margin-top:22px; justify-content:space-between;">
+        <span class="bellogue-section-tag" style="margin:0;">📰 이웃 새 글</span>
+        <span id="bellogue-neighbor-refresh" class="bellogue-write-btn"><i class="fa-solid fa-rotate"></i> 새 글 보기</span>
+      </div>
+      <div class="bellogue-post-list" id="bellogue-neighbor-feed-list">${feedRows}</div>
     </div>
     <div class="bellogue-page bellogue-feed-page${sub === 'discover' ? ' bellogue-mobile-active' : ''}">
       <span class="bellogue-section-tag bellogue-section-tag-alt" style="margin:0 0 10px;">✨ 발견</span>
@@ -717,8 +775,8 @@ function neighborListHtml(dialog, neighbors) {
   `;
 }
 
-function neighborVisitHtml(neighbor) {
-  const post = neighbor.posts[0];
+function neighborVisitHtml(neighbor, postId) {
+  const post = (postId && neighbor.posts.find(p => p.id === postId)) || neighbor.posts[0];
   const bodyHtml = (post ? post.body : '').split(/\n+/).map(p => p.trim()).filter(Boolean)
     .map((p, i) => `<p class="bellogue-post-para${i === 0 ? ' bellogue-dropcap' : ''}">${escapeHtml(p)}</p>`).join('');
   const img = post && post.image ? `<div class="bellogue-post-image" style="background-image:url('${post.image}')"></div>` : '';
@@ -771,10 +829,33 @@ function wireNeighborEvents(dialog) {
     });
   });
 
+  scroll.querySelectorAll('.bellogue-neighbor-row[data-feed-neighbor]').forEach(row => {
+    row.addEventListener('click', function () {
+      dialog._neighborView = { id: this.dataset.feedNeighbor, postId: this.dataset.feedPost };
+      showTab(dialog, 'neighbor');
+    });
+  });
+
+  const refreshBtn = scroll.querySelector('#bellogue-neighbor-refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', async function () {
+    if (refreshBtn.dataset.loading === '1') return;
+    refreshBtn.dataset.loading = '1';
+    const originalHtml = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '불러오는 중...';
+    const result = await generateNeighborFeedPost();
+    if (!result.ok) {
+      refreshBtn.innerHTML = originalHtml;
+      refreshBtn.dataset.loading = '0';
+      alert('새 글을 불러오지 못했어요. 연결 프로필을 확인해주세요.');
+      return;
+    }
+    showTab(dialog, 'neighbor');
+  });
+
   scroll.querySelectorAll('.bellogue-neighbor-row[data-id]').forEach(row => {
     row.addEventListener('click', function (e) {
       if (e.target.closest('.bellogue-add-friend-btn')) return;
-      dialog._neighborView = this.dataset.id;
+      dialog._neighborView = { id: this.dataset.id };
       showTab(dialog, 'neighbor');
     });
   });
@@ -802,8 +883,9 @@ function wireNeighborEvents(dialog) {
     const text = input.value.trim();
     if (!text) return;
     const s = getSettings();
-    const neighbor = s.neighbors.find(n => n.id === dialog._neighborView);
-    const post = neighbor.posts[0];
+    const view = dialog._neighborView;
+    const neighbor = s.neighbors.find(n => n.id === view.id);
+    const post = (view.postId && neighbor.posts.find(p => p.id === view.postId)) || neighbor.posts[0];
     post.comments = post.comments || [];
     post.comments.push({ id: 'c_' + Date.now(), name: s.nickname || '나', text });
     saveSettingsDebounced();
