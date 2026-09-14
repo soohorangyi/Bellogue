@@ -118,8 +118,8 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-post-para:last-child { margin-bottom: 0; }
 .bellogue-dropcap::first-letter { float: left; font-size: 26px; font-weight: 700; color: var(--bn-accent); margin: 0 5px 0 0; }
 .bellogue-section-tag { display: inline-block; font-size: 10px; color: var(--bn-paper); background: var(--bn-accent); border-radius: 2px; padding: 2px 8px; font-weight: 600; letter-spacing: 0.5px; margin: 26px 0 10px; }
-.bellogue-comments-box { border: 0.5px solid var(--bn-line); border-radius: 3px; padding: 4px 14px; background: rgba(107,68,68,0.03); }
-.bellogue-comments-box .bellogue-section-tag { margin-top: 12px; }
+.bellogue-comments-box { border: 0.5px solid var(--bn-line); border-radius: 3px; padding: 4px 14px; background: rgba(107,68,68,0.03); margin-top: 14px; }
+.bellogue-comments-box .bellogue-section-tag { margin: 8px 0; }
 .bellogue-comment-row { padding: 8px 0; border-top: 0.5px solid #EFE9DC; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .bellogue-comment-row:first-of-type { border-top: none; }
 .bellogue-comment-row p { margin: 0; font-size: 11px; }
