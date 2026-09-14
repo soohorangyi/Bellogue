@@ -844,7 +844,7 @@ function neighborVisitHtml(neighbor, postId) {
     .map((p, i) => `<p class="bellogue-post-para${i === 0 ? ' bellogue-dropcap' : ''}">${escapeHtml(p)}</p>`).join('');
   const img = post && post.image ? `<div class="bellogue-post-image" style="background-image:url('${post.image}')"></div>` : '';
   const commentsList = (post && post.comments || []).map(c => `
-    <div class="bellogue-comment-row"><p><span class="bellogue-comment-name">${escapeHtml(c.name)}</span> ${escapeHtml(c.text)}</p></div>`).join('');
+    <div class="bellogue-comment-row${c.replyTo ? ' bellogue-comment-reply' : ''}"><p>${c.replyTo ? '<i class="fa-solid fa-reply" style="font-size:9px;color:var(--bn-muted);margin-right:4px;"></i>' : ''}<span class="bellogue-comment-name">${escapeHtml(c.name)}</span> ${escapeHtml(c.text)}</p></div>`).join('');
 
   return `
     <div class="bellogue-post">
@@ -1007,18 +1007,19 @@ function wireNeighborEvents(dialog) {
     const neighbor = s.neighbors.find(n => n.id === view.id);
     const post = (view.postId && neighbor.posts.find(p => p.id === view.postId)) || neighbor.posts[0];
     post.comments = post.comments || [];
-    post.comments.push({ id: 'c_' + Date.now(), name: s.nickname || '나', text });
+    const userComment = { id: 'c_' + Date.now(), name: s.nickname || '나', text };
+    post.comments.push(userComment);
     saveSettingsDebounced();
 
     submitBtn.dataset.loading = '1';
-    submitBtn.textContent = '답장 기다리는 중...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-rotate bellogue-spin"></i>';
     submitBtn.disabled = true;
     const result = await generateNeighborReply(neighbor, post, text);
     if (result.ok) {
       const s2 = getSettings();
       const n2 = s2.neighbors.find(n => n.id === neighbor.id);
       const p2 = n2.posts.find(p => p.id === post.id);
-      p2.comments.push({ id: 'c_' + Date.now() + '_r', name: neighbor.name, text: result.reply });
+      p2.comments.push({ id: 'c_' + Date.now() + '_r', name: neighbor.name, text: result.reply, replyTo: userComment.id });
       saveSettingsDebounced();
     }
     showTab(dialog, 'neighbor');
