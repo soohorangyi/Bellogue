@@ -223,6 +223,55 @@ ${langLine}`;
   }
 }
 
+// 이웃들끼리 서로의 글에 댓글을 하나 남겨줌 (다른 이웃이 쓴 글에, 또 다른 이웃이 반응)
+async function generateOneNeighborReaction() {
+  const s = getSettings();
+  if (s.neighbors.length < 2) return { ok: false };
+
+  const candidates = [];
+  s.neighbors.forEach(n => {
+    n.posts.forEach(p => {
+      if ((p.comments || []).length < 3) candidates.push({ neighbor: n, post: p });
+    });
+  });
+  if (!candidates.length) return { ok: false };
+
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  const commenterPool = s.neighbors.filter(n => n.id !== pick.neighbor.id);
+  const commenter = commenterPool[Math.floor(Math.random() * commenterPool.length)];
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = `${WORLD_GUARD}
+당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${commenter.name}"입니다. 직업은 ${commenter.job}입니다.
+이웃 주민 "${pick.neighbor.name}"이(가) 쓴 글에 짧은 댓글을 하나 남겨주세요.
+제목: ${pick.post.title}
+내용: ${pick.post.body}
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"text":"댓글 내용 (1문장)"}
+${ERA_RULE}
+${langLine}`;
+
+  try {
+    const raw = await generateWithProfile(prompt);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON in response');
+    const data = JSON.parse(match[0]);
+    if (!data.text) throw new Error('empty text');
+
+    const s2 = getSettings();
+    const n2 = s2.neighbors.find(n => n.id === pick.neighbor.id);
+    const p2 = n2.posts.find(p => p.id === pick.post.id);
+    if (p2) {
+      p2.comments = p2.comments || [];
+      p2.comments.push({ id: 'c_' + Date.now() + '_nb', name: commenter.name, text: data.text });
+      saveSettingsDebounced();
+    }
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 이웃 반응 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
 // 발견 탭 새로고침 — AI로 새로운 벨 누아 주민을 한 명 만들어 발견 풀에 추가 (최대 10명, 넘으면 오래된 것부터 밀려남)
 async function generateDiscoverNeighbor() {
   const s = getSettings();
@@ -1004,7 +1053,8 @@ function wireNeighborEvents(dialog) {
     refreshBtn.dataset.loading = '1';
     refreshBtn.classList.add('bellogue-spin');
     const result = await generateNeighborFeedPost();
-    if (!result.ok) {
+    const reaction = await generateOneNeighborReaction();
+    if (!result.ok && !reaction.ok) {
       refreshBtn.classList.remove('bellogue-spin');
       refreshBtn.dataset.loading = '0';
       alert('새 글을 불러오지 못했어요. 연결 프로필을 확인해주세요.');
@@ -1097,6 +1147,8 @@ function wireNeighborEvents(dialog) {
       const p2 = n2.posts.find(p => p.id === post.id);
       p2.comments.push({ id: 'c_' + Date.now() + '_r', name: neighbor.name, text: result.reply, replyTo: userComment.id });
       saveSettingsDebounced();
+    } else {
+      alert('답글을 받아오지 못했어요. 내 댓글은 남아있으니 나중에 다시 시도해봐도 돼요.');
     }
     showTab(dialog, 'neighbor');
   });
