@@ -30,7 +30,7 @@ const NEIGHBOR_SEED = [
   },
   {
     id: 'nb_sylvia', name: '실비아', emoji: '📚',
-    job: '서점 점원', district: '벨벳 거리', zodiac: '천칭자리', birthday: '10월 3일',
+    job: '서점 점원', district: '대성당 지구', zodiac: '천칭자리', birthday: '10월 3일',
     intro: '책 냄새가 좋아요.',
     posts: [{
       id: 'nbp_sylvia_1', title: '손님이 두고 간 책', date: '9월 10일',
@@ -660,7 +660,7 @@ function neighborListHtml(neighbors) {
   `).join('');
   return `
     <div class="bellogue-post" style="padding:20px;">
-      <div class="bellogue-feed-header" style="justify-content:flex-start;">
+      <div class="bellogue-feed-header" style="justify-content:flex-start; margin-top:2px;">
         <span class="bellogue-section-tag" style="margin:0;">🏘 내 이웃</span>
       </div>
       <div class="bellogue-post-list">${rows}</div>
