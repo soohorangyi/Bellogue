@@ -69,6 +69,13 @@ const DISCOVER_SEED = [
 ];
 
 const BOARD_TOPICS = ['잡담', '질문', '정보공유', '후기'];
+const BOARD_DEFS = [
+  { id: 'notice', name: '공지사항' },
+  { id: 'suggest', name: '건의함' },
+  { id: 'free', name: '자유게시판' },
+  { id: 'job', name: '구인구직' },
+  { id: 'market', name: '장터' },
+];
 
 const defaultSettings = {
   nickname: "",
@@ -185,7 +192,9 @@ async function generateDiscoverNeighbor() {
   const s = getSettings();
   const existingNames = [...s.neighbors, ...s.discoverPool].map(n => n.name).join(', ');
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
-  const prompt = `1930년대풍 가상 도시 "벨 누아"에 사는 새로운 주민 한 명을 만들어주세요. 이미 존재하는 주민(${existingNames})과 겹치지 않는 이름으로 해주세요. 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+  const prompt = `1930년대풍 가상 도시 "벨 누아"에 사는 새로운 주민 한 명을 만들어주세요. 이미 존재하는 주민(${existingNames})과 겹치지 않는 이름으로 해주세요.
+이름은 반드시 서구풍 1930년대 분위기로 지어주세요 (예: 레이븐, 모라, 실비아, 테오, 이든, 베티, 클라라, 안톤 같은 느낌). 현실적인 한국 이름이나 실존 인물, 유명인 이름은 절대 쓰지 마세요.
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"name":"이름(한 단어)","job":"직업(짧게)","district":"거주구역(짧게)","zodiac":"별자리","birthday":"생년월일 (예: 3월 4일)","intro":"한줄 소개 (20자 내외)","postTitle":"오늘 쓴 일기 제목","postBody":"오늘 쓴 일기 본문 (2~3문장, 1인칭)"}
 ${langLine}`;
 
@@ -311,6 +320,7 @@ function openBellogueModal() {
   dialog._neighborMobileSub = 'friends';
   dialog._neighborManageMode = false;
   dialog._boardView = null;
+  dialog._boardTab = 'free';
   showCover(dialog);
   dialog.showModal();
 }
@@ -1039,6 +1049,7 @@ async function generateBoardPost() {
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
   const avoidAuthor = s.lastBoardAuthor ? `직전 작성자("${s.lastBoardAuthor}")와는 다른 사람이어야 합니다.` : '';
   const prompt = `1930년대풍 가상 도시 "벨 누아"의 공용 게시판(주민센터)에 올라올 법한 글 하나를 만들어주세요. 작성자는 이 도시에 사는 아무 주민이나 상관없습니다. ${avoidAuthor}
+작성자 이름은 반드시 서구풍 1930년대 분위기의 이름으로 지어주세요 (예: 레이븐, 모라, 실비아, 테오, 이든, 베티, 클라라, 안톤 같은 느낌). 현실적인 한국 이름이나 실존 인물, 유명인 이름은 절대 쓰지 마세요.
 주제는 "${BOARD_TOPICS.join('/')}" 중 하나를 고르세요.
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"author":"작성자 이름","topic":"${BOARD_TOPICS.join('|')} 중 하나","title":"제목","body":"본문 (2~4문장)"}
@@ -1101,21 +1112,35 @@ function boardHtml(dialog) {
     const post = s.boardPosts.find(p => p.id === viewId);
     if (post) return boardPostDetailHtml(post);
   }
-  const rows = s.boardPosts.map(p => `
-    <div class="bellogue-board-row" data-id="${p.id}">
-      <span class="bellogue-stamp">${escapeHtml(p.topic)}</span>
-      <span class="bellogue-row-title">${escapeHtml(p.title)}</span>
-      <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
-    </div>
-  `).join('') || `<p class="bellogue-placeholder">아직 올라온 글이 없어요.<br>새 글 보기를 눌러보세요.</p>`;
 
-  return `
-    <div class="bellogue-board">
-      <div class="bellogue-feed-header" style="justify-content:space-between;">
-        <span class="bellogue-section-tag" style="margin:0;">🏛 주민센터</span>
+  const boardTab = dialog._boardTab || 'free';
+  const navHtml = BOARD_DEFS.map(b =>
+    `<a data-board="${b.id}" class="${b.id === boardTab ? 'active' : ''}">${b.name}</a>`
+  ).join('');
+
+  let bodyHtml;
+  if (boardTab === 'free') {
+    const rows = s.boardPosts.map(p => `
+      <div class="bellogue-board-row" data-id="${p.id}">
+        <span class="bellogue-stamp">${escapeHtml(p.topic)}</span>
+        <span class="bellogue-row-title">${escapeHtml(p.title)}</span>
+        <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
+      </div>
+    `).join('') || `<p class="bellogue-placeholder">아직 올라온 글이 없어요.<br>새 글 보기를 눌러보세요.</p>`;
+    bodyHtml = `
+      <div class="bellogue-feed-header" style="justify-content:flex-end;">
         <span id="bellogue-board-refresh" class="bellogue-refresh-btn" title="새 글 보기"><i class="fa-solid fa-rotate"></i></span>
       </div>
       <div class="bellogue-board-list">${rows}</div>
+    `;
+  } else {
+    bodyHtml = `<p class="bellogue-placeholder">${escapeHtml(BOARD_DEFS.find(b => b.id === boardTab).name)} (준비 중)</p>`;
+  }
+
+  return `
+    <div class="bellogue-board">
+      <nav class="bellogue-nav" style="margin-bottom:12px;">${navHtml}</nav>
+      ${bodyHtml}
     </div>
   `;
 }
@@ -1149,6 +1174,13 @@ function boardPostDetailHtml(post) {
 
 function wireBoardEvents(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
+
+  scroll.querySelectorAll('.bellogue-nav a[data-board]').forEach(a => {
+    a.addEventListener('click', function () {
+      dialog._boardTab = this.dataset.board;
+      showTab(dialog, 'board');
+    });
+  });
 
   const refreshBtn = scroll.querySelector('#bellogue-board-refresh');
   if (refreshBtn) refreshBtn.addEventListener('click', async function () {
