@@ -1086,6 +1086,7 @@ async function generateBoardPost(boardId) {
 1930년대풍 가상 도시 "벨 누아"의 "${boardDef.name}" 게시판에 올라올 법한 글 하나를 만들어주세요.
 ${nameRule}
 ${topicLine}
+${topics.length ? `제목에는 "[${topics.join(']이나 [')}]" 같은 말머리를 절대 넣지 마세요. 뱃지로 이미 표시되니 제목은 순수한 제목만 적으세요.` : ''}
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"author":"작성자 이름","topic":"${topics.length ? topics.join('|') : '(없으면 빈 문자열)'}","title":"제목","body":"본문 (2~4문장)"}
 ${ERA_RULE}
@@ -1097,12 +1098,13 @@ ${langLine}`;
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
+    const cleanTitle = String(data.title || '').replace(/^\s*\[[^\]]{1,6}\]\s*/, '');
     const post = {
       id: 'bp_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       boardId,
       author: data.author || '익명의 주민',
       topic: topics.includes(data.topic) ? data.topic : (topics[0] || ''),
-      title: data.title || '오늘의 이야기',
+      title: cleanTitle || '오늘의 이야기',
       body: data.body || '별일 없이 지나간 하루였다.',
       date: todayStr(), comments: [],
     };
