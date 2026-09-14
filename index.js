@@ -46,29 +46,6 @@ function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function resizeImageFile(file, maxW, maxH) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        let w = img.width, h = img.height;
-        const ratio = Math.min(maxW / w, maxH / h, 1);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 // ── 확장프로그램 관리 탭 설정 패널 ──────────────────────────────
 jQuery(async () => {
   const settings = getSettings();
@@ -195,8 +172,10 @@ function showCover(dialog) {
 
   scroll.innerHTML = `
     <div class="bellogue-cover">
-      <div class="bellogue-cover-icon"><i class="fa-solid fa-moon"></i></div>
-      <p class="bellogue-tagline">ARS IN NOCTE</p>
+      <div class="bellogue-cover-icon">
+        <svg viewBox="0 0 64 64" fill="currentColor"><path d="M46 20c2-3 5-4 8-3-1 3-3 5-6 6 2 1 3 3 3 5 0 6-6 10-13 10-1 4-4 7-8 8 1 2 1 4 0 6H15c1-3 3-5 6-6-5-2-9-7-9-13 0-8 8-14 17-14 3 0 6 1 8 2-1-3 0-6 3-8 2-1 5-1 6 1-2 0-4 1-4 3 0 1 1 2 2 2 1 0 2-1 2-2z"/></svg>
+      </div>
+      <div class="bellogue-cover-rule"></div>
       <p class="bellogue-logo">BELLOGUE</p>
       <button id="bellogue-open-btn" class="bellogue-open-btn">OPEN</button>
     </div>
@@ -269,8 +248,8 @@ function profileHtml(s) {
 }
 
 function feedHtml(s, manageMode) {
-  const postsHtml = s.posts.length
-    ? s.posts.map(p => postHtml(p, manageMode)).join('')
+  const rowsHtml = s.posts.length
+    ? s.posts.map(p => feedRowHtml(p, manageMode)).join('')
     : `<p class="bellogue-placeholder">아직 쓴 글이 없어요.<br>글쓰기로 첫 글을 남겨보세요.</p>`;
 
   return `
@@ -278,7 +257,24 @@ function feedHtml(s, manageMode) {
       <span id="bellogue-manage-btn" class="bellogue-icon-btn" title="글 관리"><i class="fa-solid fa-gear"></i></span>
       <span id="bellogue-write-btn" class="bellogue-write-btn"><i class="fa-solid fa-feather"></i> 글쓰기</span>
     </div>
-    <div class="bellogue-post-list">${postsHtml}</div>
+    <div class="bellogue-post-list">${rowsHtml}</div>
+  `;
+}
+
+function feedRowHtml(post, manageMode) {
+  const editDel = manageMode ? `
+    <span class="bellogue-post-edit" data-id="${post.id}">수정</span>
+    <span class="bellogue-post-delete" data-id="${post.id}">삭제</span>` : '';
+  const thumb = post.image ? `<div class="bellogue-row-thumb" style="background-image:url('${post.image}')"></div>` : '';
+  return `
+    <div class="bellogue-post-row" data-id="${post.id}">
+      ${thumb}
+      <div class="bellogue-row-main">
+        <p class="bellogue-post-title">${escapeHtml(post.title)}</p>
+        <span class="bellogue-meta">${escapeHtml(post.date)}</span>
+      </div>
+      <div class="bellogue-row-actions">${editDel}</div>
+    </div>
   `;
 }
 
@@ -295,6 +291,7 @@ function postHtml(post, manageMode) {
 
   return `
     <div class="bellogue-post" data-id="${post.id}">
+      <p id="bellogue-write-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 목록으로</p>
       <div class="bellogue-post-head">
         <p class="bellogue-post-title">${escapeHtml(post.title)}</p>
         <div class="bellogue-post-head-right"><span class="bellogue-meta">${escapeHtml(post.date)}</span>${editDel}</div>
@@ -306,15 +303,45 @@ function postHtml(post, manageMode) {
   `;
 }
 
-// ── 프로필 사진 크롭 ─────────────────────────────────────────
-function showAvatarCropper(dialog, srcDataUrl) {
+function showPostDetail(dialog, postId) {
+  const s = getSettings();
+  const post = s.posts.find(p => p.id === postId);
+  if (!post) return;
   const scroll = dialog.querySelector('#bellogue-scroll');
-  const FRAME_W = 260, FRAME_H = 325; // 4:5
+  scroll.innerHTML = postHtml(post, !!dialog._manageMode);
+
+  scroll.querySelector('#bellogue-write-back').addEventListener('click', () => { dialog._mobileSub = 'feed'; showTab(dialog, 'blog'); });
+  const editEl = scroll.querySelector('.bellogue-post-edit');
+  if (editEl) editEl.addEventListener('click', () => showWrite(dialog, post.id));
+  const delEl = scroll.querySelector('.bellogue-post-delete');
+  if (delEl) delEl.addEventListener('click', () => {
+    if (!confirm('이 글을 삭제할까요?')) return;
+    const s2 = getSettings();
+    s2.posts = s2.posts.filter(p => p.id !== post.id);
+    saveSettingsDebounced();
+    dialog._mobileSub = 'feed';
+    showTab(dialog, 'blog');
+  });
+  scroll.querySelectorAll('.bellogue-comment-delete').forEach(el => {
+    el.addEventListener('click', function () {
+      if (!confirm('이 댓글을 삭제할까요?')) return;
+      const s2 = getSettings();
+      const p2 = s2.posts.find(p => p.id === this.dataset.post);
+      if (p2) p2.comments = (p2.comments || []).filter(c => c.id !== this.dataset.comment);
+      saveSettingsDebounced();
+      showPostDetail(dialog, postId);
+    });
+  });
+}
+
+// ── 이미지 크롭 (프로필/글 이미지 공용) ──────────────────────
+function showImageCropper(dialog, srcDataUrl, frameW, frameH, outW, outH, onConfirm, onCancel) {
+  const scroll = dialog.querySelector('#bellogue-scroll');
 
   scroll.innerHTML = `
     <div class="bellogue-crop">
       <p class="bellogue-back-link" id="bellogue-crop-cancel"><i class="fa-solid fa-arrow-left"></i> 취소</p>
-      <div class="bellogue-crop-frame" id="bellogue-crop-frame" style="width:${FRAME_W}px;height:${FRAME_H}px;">
+      <div class="bellogue-crop-frame" id="bellogue-crop-frame" style="width:${frameW}px;height:${frameH}px;">
         <img id="bellogue-crop-img" src="${srcDataUrl}" draggable="false">
       </div>
       <input type="range" id="bellogue-crop-zoom" min="1" max="3" step="0.01" value="1" class="bellogue-crop-zoom">
@@ -324,7 +351,7 @@ function showAvatarCropper(dialog, srcDataUrl) {
     </div>
   `;
 
-  scroll.querySelector('#bellogue-crop-cancel').addEventListener('click', () => showTab(dialog, 'blog'));
+  scroll.querySelector('#bellogue-crop-cancel').addEventListener('click', onCancel);
 
   const img = scroll.querySelector('#bellogue-crop-img');
   const frame = scroll.querySelector('#bellogue-crop-frame');
@@ -336,8 +363,8 @@ function showAvatarCropper(dialog, srcDataUrl) {
   function clampOffsets() {
     const dispW = img.naturalWidth * baseScale * zoom;
     const dispH = img.naturalHeight * baseScale * zoom;
-    offX = Math.min(0, Math.max(FRAME_W - dispW, offX));
-    offY = Math.min(0, Math.max(FRAME_H - dispH, offY));
+    offX = Math.min(0, Math.max(frameW - dispW, offX));
+    offY = Math.min(0, Math.max(frameH - dispH, offY));
   }
   function render() {
     clampOffsets();
@@ -350,9 +377,9 @@ function showAvatarCropper(dialog, srcDataUrl) {
   }
 
   img.onload = function () {
-    baseScale = Math.max(FRAME_W / img.naturalWidth, FRAME_H / img.naturalHeight);
-    offX = (FRAME_W - img.naturalWidth * baseScale) / 2;
-    offY = (FRAME_H - img.naturalHeight * baseScale) / 2;
+    baseScale = Math.max(frameW / img.naturalWidth, frameH / img.naturalHeight);
+    offX = (frameW - img.naturalWidth * baseScale) / 2;
+    offY = (frameH - img.naturalHeight * baseScale) / 2;
     render();
   };
   if (img.complete && img.naturalWidth) img.onload();
@@ -389,18 +416,15 @@ function showAvatarCropper(dialog, srcDataUrl) {
     const scaleFactor = baseScale * zoom;
     const sx = -offX / scaleFactor;
     const sy = -offY / scaleFactor;
-    const sW = FRAME_W / scaleFactor;
-    const sH = FRAME_H / scaleFactor;
+    const sW = frameW / scaleFactor;
+    const sH = frameH / scaleFactor;
 
     const canvas = document.createElement('canvas');
-    canvas.width = 400; canvas.height = 500;
-    canvas.getContext('2d').drawImage(img, sx, sy, sW, sH, 0, 0, 400, 500);
+    canvas.width = outW; canvas.height = outH;
+    canvas.getContext('2d').drawImage(img, sx, sy, sW, sH, 0, 0, outW, outH);
 
     if (!dialog.open) dialog.showModal();
-    const s = getSettings();
-    s.profileImage = canvas.toDataURL('image/jpeg', 0.85);
-    saveSettingsDebounced();
-    showTab(dialog, 'blog');
+    onConfirm(canvas.toDataURL('image/jpeg', 0.85));
   });
 }
 
@@ -423,7 +447,15 @@ function wireBlogEvents(dialog) {
     // 모바일에서 OS 사진 선택창 때문에 dialog가 백그라운드 처리되어 닫히는 경우 대비
     if (!dialog.open) dialog.showModal();
     const reader = new FileReader();
-    reader.onload = () => showAvatarCropper(dialog, reader.result);
+    reader.onload = () => showImageCropper(dialog, reader.result, 260, 325, 400, 500,
+      (dataUrl) => {
+        const s = getSettings();
+        s.profileImage = dataUrl;
+        saveSettingsDebounced();
+        showTab(dialog, 'blog');
+      },
+      () => showTab(dialog, 'blog')
+    );
     reader.readAsDataURL(file);
   });
 
@@ -436,13 +468,21 @@ function wireBlogEvents(dialog) {
     showWrite(dialog, null);
   });
 
+  scroll.querySelectorAll('.bellogue-post-row').forEach(row => {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('.bellogue-row-actions')) return;
+      showPostDetail(dialog, this.dataset.id);
+    });
+  });
   scroll.querySelectorAll('.bellogue-post-edit').forEach(el => {
-    el.addEventListener('click', function () {
+    el.addEventListener('click', function (e) {
+      e.stopPropagation();
       showWrite(dialog, this.dataset.id);
     });
   });
   scroll.querySelectorAll('.bellogue-post-delete').forEach(el => {
-    el.addEventListener('click', function () {
+    el.addEventListener('click', function (e) {
+      e.stopPropagation();
       if (!confirm('이 글을 삭제할까요?')) return;
       const s = getSettings();
       s.posts = s.posts.filter(p => p.id !== this.dataset.id);
@@ -450,49 +490,57 @@ function wireBlogEvents(dialog) {
       showTab(dialog, 'blog');
     });
   });
-  scroll.querySelectorAll('.bellogue-comment-delete').forEach(el => {
-    el.addEventListener('click', function () {
-      if (!confirm('이 댓글을 삭제할까요?')) return;
-      const s = getSettings();
-      const post = s.posts.find(p => p.id === this.dataset.post);
-      if (post) post.comments = (post.comments || []).filter(c => c.id !== this.dataset.comment);
-      saveSettingsDebounced();
-      showTab(dialog, 'blog');
-    });
-  });
 }
 
 // ── 글쓰기 ───────────────────────────────────────────────────
-function showWrite(dialog, editingId) {
+function showWrite(dialog, editingId, draft) {
   const s = getSettings();
   const editingPost = editingId ? s.posts.find(p => p.id === editingId) : null;
   const scroll = dialog.querySelector('#bellogue-scroll');
 
+  const initTitle = draft ? draft.title : (editingPost ? editingPost.title : '');
+  const initBody = draft ? draft.body : (editingPost ? editingPost.body : '');
+  let pendingImage = draft ? draft.image : (editingPost ? editingPost.image || '' : '');
+
+  const thumbHtml = pendingImage
+    ? `<div id="bellogue-write-thumb" class="bellogue-write-thumb" style="background-image:url('${pendingImage}')"><span class="bellogue-write-thumb-edit">변경</span></div>`
+    : `<button id="bellogue-write-image-btn" class="bellogue-btn-outline" type="button">이미지 첨부</button>`;
+
   scroll.innerHTML = `
     <div class="bellogue-write">
       <p id="bellogue-write-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 뒤로</p>
-      <input id="bellogue-write-title" type="text" class="bellogue-write-title-input" placeholder="제목을 입력하세요" value="${editingPost ? escapeHtml(editingPost.title) : ''}">
-      <textarea id="bellogue-write-body" class="bellogue-write-textarea" placeholder="오늘 있었던 일을 적어보세요...">${editingPost ? escapeHtml(editingPost.body) : ''}</textarea>
+      <input id="bellogue-write-title" type="text" class="bellogue-write-title-input" placeholder="제목을 입력하세요" value="${escapeHtml(initTitle)}">
+      <textarea id="bellogue-write-body" class="bellogue-write-textarea" placeholder="오늘 있었던 일을 적어보세요...">${escapeHtml(initBody)}</textarea>
       <input type="file" id="bellogue-write-image-input" accept="image/*" style="display:none;">
+      <div class="bellogue-write-image-row">${thumbHtml}</div>
       <div class="bellogue-write-actions">
-        <button id="bellogue-write-image-btn" class="bellogue-btn-outline" type="button">이미지 첨부</button>
         <button id="bellogue-write-submit" class="bellogue-btn-primary" type="button">${editingPost ? '수정 완료' : '등록'}</button>
       </div>
     </div>
   `;
 
-  let pendingImage = editingPost ? editingPost.image || '' : '';
-
   scroll.querySelector('#bellogue-write-back').addEventListener('click', () => { dialog._mobileSub = 'feed'; showTab(dialog, 'blog'); });
 
-  scroll.querySelector('#bellogue-write-image-btn').addEventListener('click', function () {
+  function openImagePicker() {
     scroll.querySelector('#bellogue-write-image-input').click();
-  });
-  scroll.querySelector('#bellogue-write-image-input').addEventListener('change', async function () {
+  }
+  const imgBtn = scroll.querySelector('#bellogue-write-image-btn');
+  if (imgBtn) imgBtn.addEventListener('click', openImagePicker);
+  const thumbEl = scroll.querySelector('#bellogue-write-thumb');
+  if (thumbEl) thumbEl.addEventListener('click', openImagePicker);
+
+  scroll.querySelector('#bellogue-write-image-input').addEventListener('change', function () {
     const file = this.files[0];
     if (!file) return;
     if (!dialog.open) dialog.showModal();
-    pendingImage = await resizeImageFile(file, 600, 600);
+    const curTitle = scroll.querySelector('#bellogue-write-title').value;
+    const curBody = scroll.querySelector('#bellogue-write-body').value;
+    const reader = new FileReader();
+    reader.onload = () => showImageCropper(dialog, reader.result, 300, 200, 640, 420,
+      (dataUrl) => showWrite(dialog, editingId, { title: curTitle, body: curBody, image: dataUrl }),
+      () => showWrite(dialog, editingId, { title: curTitle, body: curBody, image: pendingImage })
+    );
+    reader.readAsDataURL(file);
   });
 
   scroll.querySelector('#bellogue-write-submit').addEventListener('click', function () {
