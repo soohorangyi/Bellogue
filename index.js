@@ -1,21 +1,45 @@
 // Bellogue — 개인 다이어리 확장프로그램
 
-import { extension_settings, getContext } from "../../../extensions.js";
+import { extension_settings } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 
 const extensionName = "bellogue";
 
-const NEIGHBOR_NAME_POOL = ['레이븐', '모라', '실비아', '테오', '이든', '베티', '클라라', '안톤'];
-const NEIGHBOR_FALLBACKS = {
-  '레이븐': { job: '항구 노동자', district: '항구 지구', zodiac: '전갈자리', birthday: '11월 2일', intro: '조용히 사는 걸 좋아해요.' },
-  '모라': { job: '재봉사', district: '구시가', zodiac: '황소자리', birthday: '5월 14일', intro: '손끝으로 하는 일이 제일 편해요.' },
-  '실비아': { job: '서점 점원', district: '대성당 지구', zodiac: '천칭자리', birthday: '10월 3일', intro: '책 냄새가 좋아요.' },
-  '테오': { job: '자동차 정비공', district: '항구 지구', zodiac: '양자리', birthday: '4월 9일', intro: '기름때는 훈장 같은 거예요.' },
-  '이든': { job: '신문팔이 소년', district: '구시가', zodiac: '쌍둥이자리', birthday: '6월 20일', intro: '오늘의 특종이 궁금하면 저를 찾으세요.' },
-  '베티': { job: '카페 종업원', district: '대성당 지구', zodiac: '게자리', birthday: '7월 1일', intro: '단골손님 얼굴은 다 외워요.' },
-  '클라라': { job: '피아노 교습소 선생', district: '구시가', zodiac: '물병자리', birthday: '2월 8일', intro: '음악이 없는 밤은 상상할 수 없어요.' },
-  '안톤': { job: '시계 수리공', district: '대성당 지구', zodiac: '염소자리', birthday: '1월 12일', intro: '시간은 거짓말을 안 해요.' },
-};
+const NEIGHBOR_SEED = [
+  {
+    id: 'nb_raven', name: '레이븐', emoji: '⚓',
+    job: '항구 노동자', district: '항구 지구', zodiac: '전갈자리', birthday: '11월 2일',
+    intro: '조용히 사는 걸 좋아해요.',
+    posts: [{
+      id: 'nbp_raven_1', title: '오늘 항구 쪽 안개가 심하네요', date: '9월 12일',
+      body: '일이 일찍 끝나서 부둣가에 앉아 있었다. 안개가 짙어서 배들도 다 늦게 들어왔다.',
+      image: '',
+      comments: [{ id: 'c1', name: '모라', text: '안개 낀 항구, 상상만 해도 운치있네요' }],
+    }],
+  },
+  {
+    id: 'nb_mora', name: '모라', emoji: '🧵',
+    job: '재봉사', district: '구시가', zodiac: '황소자리', birthday: '5월 14일',
+    intro: '손끝으로 하는 일이 제일 편해요.',
+    posts: [{
+      id: 'nbp_mora_1', title: '새 원단이 들어왔다', date: '9월 11일',
+      body: '이번에 들어온 원단이 색이 참 곱다. 누구 옷을 지어볼까 고민중.',
+      image: '',
+      comments: [{ id: 'c1', name: '실비아', text: '저도 새 옷 한 벌 부탁드려도 될까요?' }],
+    }],
+  },
+  {
+    id: 'nb_sylvia', name: '실비아', emoji: '📚',
+    job: '서점 점원', district: '대성당 지구', zodiac: '천칭자리', birthday: '10월 3일',
+    intro: '책 냄새가 좋아요.',
+    posts: [{
+      id: 'nbp_sylvia_1', title: '손님이 두고 간 책', date: '9월 10일',
+      body: '낯선 손님이 책 한 권을 두고 갔다. 겉표지에 아무 글씨도 없어서 괜히 궁금해진다.',
+      image: '',
+      comments: [{ id: 'c1', name: '레이븐', text: '무슨 책이었는지 꼭 알려주세요' }],
+    }],
+  },
+];
 
 const defaultSettings = {
   nickname: "",
@@ -29,8 +53,7 @@ const defaultSettings = {
   intro: "",
   profileImage: "",   // base64 data URL
   posts: [],          // [{ id, title, body, image, date, comments:[{id,name,text}] }]
-  neighbors: [],       // [{ id, name, job, district, zodiac, birthday, intro, posts:[...] }]
-  neighborsSeedAttempted: false,
+  neighbors: [],       // [{ id, name, emoji, job, district, zodiac, birthday, intro, posts:[...] }]
 };
 
 function getSettings() {
@@ -64,64 +87,12 @@ function todayStr() {
   return new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
 }
 
-function fallbackNeighbor(name) {
-  const f = NEIGHBOR_FALLBACKS[name] || { job: '벨 누아 주민', district: '구시가', zodiac: '', birthday: '', intro: '안녕하세요.' };
-  return {
-    id: 'nb_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-    name, ...f,
-    posts: [{
-      id: 'post_' + Date.now(),
-      title: '오늘 하루',
-      body: '별일 없이 지나간 하루였다.',
-      image: '', date: todayStr(), comments: [],
-    }],
-  };
-}
-
-// AI를 이용해 벨 누아 주민(이웃) 한 명을 생성. 실패하면 미리 준비된 캐릭터로 대체.
-async function generateNeighbor() {
-  const name = NEIGHBOR_NAME_POOL[Math.floor(Math.random() * NEIGHBOR_NAME_POOL.length)];
-  const settings = getSettings();
-  const langLine = settings.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
-  const prompt = `당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${name}"입니다. 아래 JSON 형식으로만 답하세요. 다른 설명은 절대 붙이지 마세요.
-{"job":"직업(짧게)","district":"거주구역(짧게)","zodiac":"별자리","birthday":"생년월일 (예: 3월 4일)","intro":"한줄 소개 (20자 내외)","postTitle":"오늘 쓴 일기 제목","postBody":"오늘 쓴 일기 본문 (2~3문장, 1인칭)"}
-${langLine}`;
-
-  try {
-    const context = getContext();
-    const raw = await context.generateQuietPrompt(prompt, false, false);
-    const match = String(raw).match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('no JSON in response');
-    const data = JSON.parse(match[0]);
-    return {
-      id: 'nb_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-      name,
-      job: data.job || '', district: data.district || '', zodiac: data.zodiac || '',
-      birthday: data.birthday || '', intro: data.intro || '',
-      posts: [{
-        id: 'post_' + Date.now(),
-        title: data.postTitle || '오늘 하루',
-        body: data.postBody || '별일 없이 지나간 하루였다.',
-        image: '', date: todayStr(), comments: [],
-      }],
-    };
-  } catch (e) {
-    console.warn('[Bellogue] 이웃 AI 생성 실패, 기본 캐릭터로 대체:', e);
-    return fallbackNeighbor(name);
-  }
-}
-
-// 처음 한 번, 랜덤 이웃 1명을 미리 친구로 만들어둠
-async function ensureNeighborSeeded(dialog) {
+// 처음 한 번, 미리 준비된 이웃 3명을 그대로 친구로 등록
+function ensureNeighborSeeded() {
   const s = getSettings();
-  if (s.neighbors.length > 0 || s.neighborsSeedAttempted) return;
-  s.neighborsSeedAttempted = true;
+  if (s.neighbors.length > 0) return;
+  s.neighbors = JSON.parse(JSON.stringify(NEIGHBOR_SEED));
   saveSettingsDebounced();
-  const neighbor = await generateNeighbor();
-  const s2 = getSettings();
-  s2.neighbors.push(neighbor);
-  saveSettingsDebounced();
-  if (dialog.open && dialog._activeTab === 'neighbor') showTab(dialog, 'neighbor');
 }
 
 // ── 확장프로그램 관리 탭 설정 패널 ──────────────────────────────
@@ -213,6 +184,7 @@ function openBellogueModal() {
   if (!dialog) dialog = buildBellogueDialog();
   dialog._manageMode = false;
   dialog._mobileSub = 'profile';
+  dialog._neighborView = null;
   showCover(dialog);
   dialog.showModal();
 }
@@ -282,7 +254,6 @@ function showTab(dialog, name) {
   } else if (name === 'neighbor') {
     scroll.innerHTML = neighborTabHtml(dialog);
     wireNeighborEvents(dialog);
-    ensureNeighborSeeded(dialog);
   } else {
     scroll.innerHTML = blogHtml(dialog);
     wireBlogEvents(dialog);
@@ -663,11 +634,33 @@ function showWrite(dialog, editingId, draft) {
 
 // ── 이웃 벨로그 ──────────────────────────────────────────────
 function neighborTabHtml(dialog) {
+  ensureNeighborSeeded();
   const s = getSettings();
-  if (s.neighbors.length === 0) {
-    return `<p class="bellogue-placeholder">${s.neighborsSeedAttempted ? '이웃을 찾는 중...' : '이웃을 찾는 중...'}</p>`;
+  const viewId = dialog._neighborView;
+  if (viewId) {
+    const neighbor = s.neighbors.find(n => n.id === viewId);
+    if (neighbor) return neighborVisitHtml(neighbor);
   }
-  return neighborVisitHtml(s.neighbors[0]);
+  return neighborListHtml(s.neighbors);
+}
+
+function neighborListHtml(neighbors) {
+  const rows = neighbors.map(n => `
+    <div class="bellogue-neighbor-row" data-id="${n.id}">
+      <div class="bellogue-neighbor-emoji">${n.emoji}</div>
+      <div class="bellogue-row-main">
+        <p class="bellogue-post-title">${escapeHtml(n.name)}</p>
+        <span class="bellogue-meta">${escapeHtml(n.job)} · ${escapeHtml(n.district)}</span>
+      </div>
+      <span class="bellogue-friend-badge">✓ 이웃</span>
+    </div>
+  `).join('');
+  return `
+    <div class="bellogue-feed-header" style="justify-content:flex-start;">
+      <span class="bellogue-section-tag" style="margin:0;">🏘 내 이웃</span>
+    </div>
+    <div class="bellogue-post-list">${rows}</div>
+  `;
 }
 
 function neighborVisitHtml(neighbor) {
@@ -679,9 +672,10 @@ function neighborVisitHtml(neighbor) {
     <div class="bellogue-comment-row"><p><span class="bellogue-comment-name">${escapeHtml(c.name)}</span> ${escapeHtml(c.text)}</p></div>`).join('');
 
   return `
-    <div class="bellogue-post" data-neighbor="${neighbor.id}">
+    <div class="bellogue-post">
+      <p id="bellogue-neighbor-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 이웃 목록으로</p>
       <div class="bellogue-neighbor-head">
-        <div class="bellogue-neighbor-avatar"><i class="fa-solid fa-moon"></i></div>
+        <div class="bellogue-neighbor-avatar">${neighbor.emoji}</div>
         <div>
           <p class="bellogue-name" style="margin:0;">${escapeHtml(neighbor.name)}</p>
           <p class="bellogue-post-subtitle" style="margin:2px 0 0;">${escapeHtml(neighbor.job)} · ${escapeHtml(neighbor.district)}</p>
@@ -715,14 +709,24 @@ function neighborVisitHtml(neighbor) {
 
 function wireNeighborEvents(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
+
+  scroll.querySelectorAll('.bellogue-neighbor-row').forEach(row => {
+    row.addEventListener('click', function () {
+      dialog._neighborView = this.dataset.id;
+      showTab(dialog, 'neighbor');
+    });
+  });
+
+  const backEl = scroll.querySelector('#bellogue-neighbor-back');
+  if (backEl) backEl.addEventListener('click', () => { dialog._neighborView = null; showTab(dialog, 'neighbor'); });
+
   const submitBtn = scroll.querySelector('#bellogue-neighbor-comment-submit');
-  if (!submitBtn) return;
-  submitBtn.addEventListener('click', function () {
+  if (submitBtn) submitBtn.addEventListener('click', function () {
     const input = scroll.querySelector('#bellogue-neighbor-comment-input');
     const text = input.value.trim();
     if (!text) return;
     const s = getSettings();
-    const neighbor = s.neighbors[0];
+    const neighbor = s.neighbors.find(n => n.id === dialog._neighborView);
     const post = neighbor.posts[0];
     post.comments = post.comments || [];
     post.comments.push({ id: 'c_' + Date.now(), name: s.nickname || '나', text });
