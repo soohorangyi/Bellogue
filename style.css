@@ -165,6 +165,9 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 
 /* 주민센터 */
 .bellogue-board { width: 100%; box-sizing: border-box; padding: 20px; }
+.bellogue-nav { display: flex; border-bottom: 0.5px solid var(--bn-line); flex-wrap: wrap; }
+.bellogue-nav a { font-size: 12px; padding: 8px 10px; letter-spacing: 0.3px; cursor: pointer; color: var(--bn-ink-soft); }
+.bellogue-nav a.active { color: var(--bn-accent); font-weight: 600; border-bottom: 2px solid var(--bn-accent); margin-bottom: -2px; }
 .bellogue-board-row { display: flex; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 0.5px solid var(--bn-line); cursor: pointer; }
 .bellogue-stamp { font-size: 10px; color: var(--bn-paper); background: var(--bn-accent); border-radius: 2px; padding: 2px 7px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
 .bellogue-row-title { flex: 1; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
