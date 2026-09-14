@@ -143,6 +143,13 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-crop-frame img { position: absolute; user-select: none; -webkit-user-drag: none; }
 .bellogue-crop-zoom { width: 80%; margin: 16px auto 0; display: block; }
 
+/* 이웃 벨로그 */
+.bellogue-neighbor-head { display: flex; align-items: center; gap: 12px; }
+.bellogue-neighbor-avatar { width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.bellogue-friend-badge { margin-left: auto; font-size: 10px; color: var(--bn-accent); border: 0.5px solid var(--bn-accent); border-radius: 2px; padding: 3px 7px; white-space: nowrap; }
+.bellogue-comment-form { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 0.5px solid #EFE9DC; }
+.bellogue-comment-input { flex: 1; box-sizing: border-box; border: 0.5px solid var(--bn-line); border-radius: 2px; font-family: inherit; font-size: 11.5px; padding: 7px 9px; color: var(--bn-ink); background: var(--bn-paper); }
+
 /* 주민센터 */
 .bellogue-board { width: 100%; padding: 4px; }
 .bellogue-board-header { display: flex; justify-content: flex-end; margin-bottom: 8px; }
