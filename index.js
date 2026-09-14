@@ -277,26 +277,37 @@ function feedRowHtml(post, manageMode) {
 }
 
 function postHtml(post, manageMode) {
+  const s = getSettings();
   const img = post.image ? `<div class="bellogue-post-image" style="background-image:url('${post.image}')"></div>` : '';
   const editDel = manageMode ? `
     <span class="bellogue-post-edit" data-id="${post.id}">수정</span>
     <span class="bellogue-post-delete" data-id="${post.id}">삭제</span>` : '';
-  const comments = (post.comments || []).map(c => `
+  const bodyHtml = post.body.split(/\n+/).map(p => p.trim()).filter(Boolean)
+    .map((p, i) => `<p class="bellogue-post-para${i === 0 ? ' bellogue-dropcap' : ''}">${escapeHtml(p)}</p>`).join('');
+  const commentsList = (post.comments || []).map(c => `
     <div class="bellogue-comment-row">
       <p><span class="bellogue-comment-name">${escapeHtml(c.name)}</span> ${escapeHtml(c.text)}</p>
       ${manageMode ? `<span class="bellogue-comment-delete" data-post="${post.id}" data-comment="${c.id}">삭제</span>` : ''}
     </div>`).join('');
+  const commentsBox = (post.comments || []).length
+    ? `<div class="bellogue-comments-box">
+        <div class="bellogue-section-tag">💬 댓글 ${post.comments.length}</div>
+        ${commentsList}
+      </div>`
+    : `<div class="bellogue-section-tag">💬 댓글 0</div>`;
 
   return `
     <div class="bellogue-post" data-id="${post.id}">
       <p id="bellogue-write-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 목록으로</p>
-      <div class="bellogue-post-head">
-        <p class="bellogue-post-title">${escapeHtml(post.title)}</p>
-        <div class="bellogue-post-head-right"><span class="bellogue-meta">${escapeHtml(post.date)}</span>${editDel}</div>
+      <div class="bellogue-post-headrow">
+        <span class="bellogue-meta-badge">${escapeHtml(post.date)}</span>
+        ${editDel}
       </div>
+      <p class="bellogue-post-title-lg">${escapeHtml(post.title)}</p>
+      <p class="bellogue-post-subtitle">${escapeHtml(s.nickname) || '이름 없음'}의 벨로그</p>
       ${img}
-      <p class="bellogue-post-body">${escapeHtml(post.body)}</p>
-      ${comments}
+      <div class="bellogue-post-body">${bodyHtml}</div>
+      ${commentsBox}
     </div>
   `;
 }
