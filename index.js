@@ -882,6 +882,29 @@ function neighborVisitHtml(neighbor, postId) {
   `;
 }
 
+// 유저가 이웃 글에 댓글을 달면, 그 이웃이 짧게 답글을 다는 AI 함수
+async function generateNeighborReply(neighbor, post, userComment) {
+  const s = getSettings();
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = `당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${neighbor.name}"입니다. 직업은 ${neighbor.job}입니다.
+당신이 쓴 글 "${post.title}" (${post.body})에 누군가 이런 댓글을 남겼습니다: "${userComment}"
+이 댓글에 짧게(1문장) 답글을 남기세요. 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"reply":"답글 내용"}
+${langLine}`;
+  try {
+    const context = getContext();
+    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON in response');
+    const data = JSON.parse(match[0]);
+    if (!data.reply) throw new Error('empty reply');
+    return { ok: true, reply: data.reply };
+  } catch (e) {
+    console.warn('[Bellogue] 이웃 답글 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
 function wireNeighborEvents(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
 
@@ -973,10 +996,12 @@ function wireNeighborEvents(dialog) {
   if (backEl) backEl.addEventListener('click', () => { dialog._neighborView = null; showTab(dialog, 'neighbor'); });
 
   const submitBtn = scroll.querySelector('#bellogue-neighbor-comment-submit');
-  if (submitBtn) submitBtn.addEventListener('click', function () {
+  if (submitBtn) submitBtn.addEventListener('click', async function () {
     const input = scroll.querySelector('#bellogue-neighbor-comment-input');
     const text = input.value.trim();
     if (!text) return;
+    if (submitBtn.dataset.loading === '1') return;
+
     const s = getSettings();
     const view = dialog._neighborView;
     const neighbor = s.neighbors.find(n => n.id === view.id);
@@ -984,6 +1009,18 @@ function wireNeighborEvents(dialog) {
     post.comments = post.comments || [];
     post.comments.push({ id: 'c_' + Date.now(), name: s.nickname || '나', text });
     saveSettingsDebounced();
+
+    submitBtn.dataset.loading = '1';
+    submitBtn.textContent = '답장 기다리는 중...';
+    submitBtn.disabled = true;
+    const result = await generateNeighborReply(neighbor, post, text);
+    if (result.ok) {
+      const s2 = getSettings();
+      const n2 = s2.neighbors.find(n => n.id === neighbor.id);
+      const p2 = n2.posts.find(p => p.id === post.id);
+      p2.comments.push({ id: 'c_' + Date.now() + '_r', name: neighbor.name, text: result.reply });
+      saveSettingsDebounced();
+    }
     showTab(dialog, 'neighbor');
   });
 }
