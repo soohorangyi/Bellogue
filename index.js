@@ -1248,7 +1248,7 @@ function boardHtml(dialog) {
     <div class="bellogue-feed-header" style="justify-content:space-between;">
       <span class="bellogue-section-tag" style="margin:0;">🏛 주민센터</span>
       <div style="display:flex;gap:8px;align-items:center;">
-        <span id="bellogue-board-saved-toggle" class="bellogue-icon-btn" title="모아보기"><i class="${showingSaved ? 'fa-solid' : 'fa-regular'} fa-bookmark"></i></span>
+        <span id="bellogue-board-saved-toggle" class="bellogue-icon-btn${showingSaved ? ' bellogue-icon-active' : ''}" title="모아보기"><i class="fa-solid fa-bookmark"></i></span>
         <span id="bellogue-board-refresh-all" class="bellogue-refresh-btn" title="전체 새로고침"><i class="fa-solid fa-rotate"></i></span>
       </div>
     </div>
@@ -1263,7 +1263,10 @@ function boardHtml(dialog) {
         <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
       </div>
     `).join('') || `<p class="bellogue-placeholder">보관한 글이 없어요.</p>`;
-    return `<div class="bellogue-board">${topBar}<div class="bellogue-board-list" style="margin-top:12px;">${rows}</div></div>`;
+    return `<div class="bellogue-board">${topBar}
+      <p id="bellogue-board-saved-back" class="bellogue-back-link" style="margin-top:14px;"><i class="fa-solid fa-arrow-left"></i> 돌아가기</p>
+      <p class="bellogue-settings-label" style="margin:4px 0 4px;">📌 보관한 글</p>
+      <div class="bellogue-board-list">${rows}</div></div>`;
   }
 
   const navHtml = BOARD_DEFS.map(b =>
@@ -1334,7 +1337,7 @@ function boardPostDetailHtml(dialog, post) {
     <div class="bellogue-post">
       <div class="bellogue-post-headrow">
         <p id="bellogue-board-back" class="bellogue-back-link" style="margin:0;"><i class="fa-solid fa-arrow-left"></i> 목록으로</p>
-        <span id="bellogue-board-save-toggle" class="bellogue-icon-btn" title="보관"><i class="${isSaved ? 'fa-solid' : 'fa-regular'} fa-bookmark"></i></span>
+        <span id="bellogue-board-save-toggle" class="bellogue-icon-btn${isSaved ? ' bellogue-icon-active' : ''}" title="보관"><i class="fa-solid fa-bookmark"></i></span>
       </div>
       <div class="bellogue-post-headrow" style="margin-top:14px;">
         ${post.boardId === 'notice' ? `<span class="bellogue-meta-badge">관리자</span>` : (post.topic ? `<span class="bellogue-meta-badge">${escapeHtml(post.topic)}</span>` : '')}
@@ -1369,6 +1372,11 @@ function wireBoardEvents(dialog) {
   const savedToggle = scroll.querySelector('#bellogue-board-saved-toggle');
   if (savedToggle) savedToggle.addEventListener('click', function () {
     dialog._boardShowSaved = !dialog._boardShowSaved;
+    showTab(dialog, 'board');
+  });
+  const savedBack = scroll.querySelector('#bellogue-board-saved-back');
+  if (savedBack) savedBack.addEventListener('click', function () {
+    dialog._boardShowSaved = false;
     showTab(dialog, 'board');
   });
 
@@ -1498,6 +1506,12 @@ function wireBoardEvents(dialog) {
     const userComment = { id: 'c_' + Date.now(), name: s.nickname || '나', text };
     post.comments.push(userComment);
     saveSettingsDebounced();
+
+    const isMyOwnPost = post.author === (s.nickname || '나');
+    if (isMyOwnPost) {
+      showTab(dialog, 'board');
+      return;
+    }
 
     submitBtn.dataset.loading = '1';
     submitBtn.innerHTML = '<i class="fa-solid fa-rotate bellogue-spin"></i>';
