@@ -129,6 +129,7 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-write { width: 100%; padding: 4px 4px 0; }
 .bellogue-back-link { font-size: 11px; color: var(--bn-muted); cursor: pointer; margin: 0 0 16px; }
 .bellogue-write-title-input { width: 100%; box-sizing: border-box; border: none; border-bottom: 1px solid var(--bn-border); background: transparent; font-family: inherit; font-size: 14px; padding: 6px 2px; margin-bottom: 16px; color: var(--bn-ink); }
+.bellogue-select { width: 100%; box-sizing: border-box; border: 0.5px solid var(--bn-line); border-radius: 2px; font-family: inherit; font-size: 12.5px; padding: 8px 10px; margin-bottom: 14px; color: var(--bn-ink); background: var(--bn-paper); }
 .bellogue-write-textarea { width: 100%; box-sizing: border-box; border: 0.5px solid var(--bn-line); border-radius: 2px; font-family: inherit; font-size: 12.5px; padding: 10px; height: 180px; resize: none; color: var(--bn-ink); }
 .bellogue-write-image-row { margin-top: 14px; }
 .bellogue-write-thumb { width: 100%; height: 100px; border-radius: 2px; background-color: var(--bn-line); background-size: cover; background-position: center; cursor: pointer; position: relative; }
