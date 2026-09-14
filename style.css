@@ -46,8 +46,9 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 
 /* 표지 */
 .bellogue-cover { width: 100%; min-height: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 0 24px; }
-.bellogue-cover-icon { width: 46px; height: 46px; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 19px; }
-.bellogue-tagline { font-size: 10px; letter-spacing: 3px; color: var(--bn-muted); margin: 0 0 6px; }
+.bellogue-cover-icon { width: 46px; height: 46px; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+.bellogue-cover-icon svg { width: 22px; height: 22px; }
+.bellogue-cover-rule { width: 28px; height: 1px; background: var(--bn-border); margin: 0 0 16px; }
 .bellogue-logo { font-size: 23px; font-weight: 600; letter-spacing: 1px; margin: 0 0 22px; }
 .bellogue-open-btn { font-family: 'Noto Serif KR', serif; font-size: 13px; letter-spacing: 2px; border-radius: 2px; padding: 11px 28px; cursor: pointer; background: var(--bn-accent); color: var(--bn-paper); font-weight: 600; border: none; }
 
@@ -87,13 +88,21 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-recent-row { margin: 0; display: flex; justify-content: space-between; }
 .bellogue-placeholder-sm { font-size: 11px; color: var(--bn-muted); }
 
-/* 피드 */
+/* 피드 (목록) */
 .bellogue-feed-header { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-bottom: 10px; }
 .bellogue-icon-btn { font-size: 17px; color: var(--bn-ink-soft); cursor: pointer; }
 .bellogue-write-btn { font-size: 11px; background: var(--bn-accent); color: var(--bn-paper); border-radius: 2px; padding: 7px 14px; font-weight: 600; cursor: pointer; }
 
-.bellogue-post { padding: 14px 0; border-bottom: 0.5px solid var(--bn-line); }
-.bellogue-post-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.bellogue-post-row { display: flex; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 0.5px solid var(--bn-line); cursor: pointer; }
+.bellogue-row-thumb { width: 40px; height: 40px; flex-shrink: 0; border-radius: 2px; background-color: var(--bn-line); background-size: cover; background-position: center; }
+.bellogue-row-main { flex: 1; min-width: 0; }
+.bellogue-row-main .bellogue-post-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bellogue-row-main .bellogue-meta { display: block; margin-top: 2px; }
+.bellogue-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* 글 상세보기 */
+.bellogue-post { padding: 0; }
+.bellogue-post-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 14px; }
 .bellogue-post-title { margin: 0; font-size: 13px; font-weight: 600; }
 .bellogue-post-head-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .bellogue-meta { font-size: 10px; color: var(--bn-muted); white-space: nowrap; }
@@ -102,7 +111,7 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 }
 .bellogue-post-edit { border: 0.5px solid var(--bn-border); color: var(--bn-ink-soft); }
 .bellogue-post-delete, .bellogue-comment-delete { border: 0.5px solid var(--bn-danger); color: var(--bn-danger); }
-.bellogue-post-image { width: 100%; height: 90px; background-color: var(--bn-line); background-size: cover; background-position: center; border-radius: 2px; margin: 8px 0; }
+.bellogue-post-image { width: 100%; height: 140px; background-color: var(--bn-line); background-size: cover; background-position: center; border-radius: 2px; margin: 10px 0; }
 .bellogue-post-body { font-size: 11.5px; color: var(--bn-ink-soft); line-height: 1.7; margin: 6px 0 8px; }
 .bellogue-comment-row { padding: 6px 0; border-top: 0.5px solid #EFE9DC; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .bellogue-comment-row p { margin: 0; font-size: 10.5px; }
@@ -113,6 +122,9 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-back-link { font-size: 11px; color: var(--bn-muted); cursor: pointer; margin: 0 0 16px; }
 .bellogue-write-title-input { width: 100%; box-sizing: border-box; border: none; border-bottom: 1px solid var(--bn-border); background: transparent; font-family: inherit; font-size: 14px; padding: 6px 2px; margin-bottom: 16px; color: var(--bn-ink); }
 .bellogue-write-textarea { width: 100%; box-sizing: border-box; border: 0.5px solid var(--bn-line); border-radius: 2px; font-family: inherit; font-size: 12.5px; padding: 10px; height: 180px; resize: none; color: var(--bn-ink); }
+.bellogue-write-image-row { margin-top: 14px; }
+.bellogue-write-thumb { width: 100%; height: 100px; border-radius: 2px; background-color: var(--bn-line); background-size: cover; background-position: center; cursor: pointer; position: relative; }
+.bellogue-write-thumb-edit { position: absolute; right: 8px; bottom: 8px; font-size: 10px; background: rgba(36,34,32,0.65); color: var(--bn-paper); padding: 3px 8px; border-radius: 2px; }
 .bellogue-write-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .bellogue-btn-outline { font-family: inherit; font-size: 11.5px; border-radius: 2px; padding: 8px 16px; background: transparent; border: 0.5px solid var(--bn-border); cursor: pointer; color: var(--bn-ink); }
 .bellogue-btn-primary { font-family: inherit; font-size: 11.5px; border-radius: 2px; padding: 8px 16px; background: var(--bn-accent); color: var(--bn-paper); border: none; font-weight: 600; cursor: pointer; }
