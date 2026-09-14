@@ -824,14 +824,14 @@ function neighborListHtml(dialog, neighbors) {
 
       <div class="bellogue-feed-header" style="margin-top:22px; justify-content:space-between;">
         <span class="bellogue-section-tag" style="margin:0;">📰 이웃 새 글</span>
-        <span id="bellogue-neighbor-refresh" class="bellogue-write-btn"><i class="fa-solid fa-rotate"></i> 새 글 보기</span>
+        <span id="bellogue-neighbor-refresh" class="bellogue-refresh-btn" title="새 글 보기"><i class="fa-solid fa-rotate"></i></span>
       </div>
       <div class="bellogue-post-list" id="bellogue-neighbor-feed-list">${feedRows}</div>
     </div>
     <div class="bellogue-page bellogue-feed-page${sub === 'discover' ? ' bellogue-mobile-active' : ''}">
       <div class="bellogue-feed-header" style="justify-content:space-between;">
         <span class="bellogue-section-tag bellogue-section-tag-alt" style="margin:0;">✨ 발견</span>
-        <span id="bellogue-discover-refresh" class="bellogue-write-btn" style="background:#5E7E9C;"><i class="fa-solid fa-rotate"></i> 새로고침</span>
+        <span id="bellogue-discover-refresh" class="bellogue-refresh-btn" title="새로고침"><i class="fa-solid fa-rotate"></i></span>
       </div>
       <div class="bellogue-post-list">${discoverRows}</div>
     </div>
@@ -903,11 +903,10 @@ function wireNeighborEvents(dialog) {
   if (refreshBtn) refreshBtn.addEventListener('click', async function () {
     if (refreshBtn.dataset.loading === '1') return;
     refreshBtn.dataset.loading = '1';
-    const originalHtml = refreshBtn.innerHTML;
-    refreshBtn.innerHTML = '불러오는 중...';
+    refreshBtn.classList.add('bellogue-spin');
     const result = await generateNeighborFeedPost();
     if (!result.ok) {
-      refreshBtn.innerHTML = originalHtml;
+      refreshBtn.classList.remove('bellogue-spin');
       refreshBtn.dataset.loading = '0';
       alert('새 글을 불러오지 못했어요. 연결 프로필을 확인해주세요.');
       return;
@@ -919,11 +918,10 @@ function wireNeighborEvents(dialog) {
   if (discoverRefreshBtn) discoverRefreshBtn.addEventListener('click', async function () {
     if (discoverRefreshBtn.dataset.loading === '1') return;
     discoverRefreshBtn.dataset.loading = '1';
-    const originalHtml = discoverRefreshBtn.innerHTML;
-    discoverRefreshBtn.innerHTML = '불러오는 중...';
+    discoverRefreshBtn.classList.add('bellogue-spin');
     const result = await generateDiscoverNeighbor();
     if (!result.ok) {
-      discoverRefreshBtn.innerHTML = originalHtml;
+      discoverRefreshBtn.classList.remove('bellogue-spin');
       discoverRefreshBtn.dataset.loading = '0';
       alert('새 이웃을 불러오지 못했어요. 연결 프로필을 확인해주세요.');
       return;
