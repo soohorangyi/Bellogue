@@ -54,6 +54,7 @@ const defaultSettings = {
   profileImage: "",   // base64 data URL
   posts: [],          // [{ id, title, body, image, date, comments:[{id,name,text}] }]
   neighbors: [],       // [{ id, name, emoji, job, district, zodiac, birthday, intro, posts:[...] }]
+  neighborSeedVersion: 0,
 };
 
 function getSettings() {
@@ -87,11 +88,13 @@ function todayStr() {
   return new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
 }
 
-// 처음 한 번, 미리 준비된 이웃 3명을 그대로 친구로 등록
+// 처음 한 번(또는 이웃 데이터 구조가 바뀌었을 때), 미리 준비된 이웃 3명으로 교체
+const NEIGHBOR_SEED_VERSION = 1;
 function ensureNeighborSeeded() {
   const s = getSettings();
-  if (s.neighbors.length > 0) return;
+  if (s.neighborSeedVersion === NEIGHBOR_SEED_VERSION && s.neighbors.length > 0) return;
   s.neighbors = JSON.parse(JSON.stringify(NEIGHBOR_SEED));
+  s.neighborSeedVersion = NEIGHBOR_SEED_VERSION;
   saveSettingsDebounced();
 }
 
@@ -647,7 +650,7 @@ function neighborTabHtml(dialog) {
 function neighborListHtml(neighbors) {
   const rows = neighbors.map(n => `
     <div class="bellogue-neighbor-row" data-id="${n.id}">
-      <div class="bellogue-neighbor-emoji">${n.emoji}</div>
+      <div class="bellogue-neighbor-emoji">${n.emoji || '🌙'}</div>
       <div class="bellogue-row-main">
         <p class="bellogue-post-title">${escapeHtml(n.name)}</p>
         <span class="bellogue-meta">${escapeHtml(n.job)} · ${escapeHtml(n.district)}</span>
@@ -675,7 +678,7 @@ function neighborVisitHtml(neighbor) {
     <div class="bellogue-post">
       <p id="bellogue-neighbor-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 이웃 목록으로</p>
       <div class="bellogue-neighbor-head">
-        <div class="bellogue-neighbor-avatar">${neighbor.emoji}</div>
+        <div class="bellogue-neighbor-avatar">${neighbor.emoji || '🌙'}</div>
         <div>
           <p class="bellogue-name" style="margin:0;">${escapeHtml(neighbor.name)}</p>
           <p class="bellogue-post-subtitle" style="margin:2px 0 0;">${escapeHtml(neighbor.job)} · ${escapeHtml(neighbor.district)}</p>
