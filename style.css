@@ -157,7 +157,8 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
   border: 0.5px solid var(--bn-accent); color: var(--bn-accent); background: transparent;
   font-size: 11px; cursor: pointer;
 }
-.bellogue-refresh-btn.bellogue-spin i { animation: bellogue-spin-anim 0.8s linear infinite; }
+.bellogue-comment-reply { margin-left: 22px; }
+.bellogue-spin { animation: bellogue-spin-anim 0.8s linear infinite; }
 @keyframes bellogue-spin-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .bellogue-comment-form { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 0.5px solid #EFE9DC; }
 .bellogue-comment-input { flex: 1; box-sizing: border-box; border: 0.5px solid var(--bn-line); border-radius: 2px; font-family: inherit; font-size: 11.5px; padding: 7px 9px; color: var(--bn-ink); background: var(--bn-paper); }
