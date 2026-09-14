@@ -82,6 +82,9 @@ const defaultSettings = {
   posts: [],          // [{ id, title, body, image, date, comments:[{id,name,text}] }]
   neighbors: [],       // [{ id, name, emoji, job, district, zodiac, birthday, intro, posts:[...] }]
   neighborFeed: [],     // [{ neighborId, postId }] 최신순, 최대 5개
+  lastFeedNeighborId: "",
+  discoverPool: [],     // 발견 탭에 보여줄 NPC 풀, 최대 10명
+  discoverPoolSeedVersion: 0,
   neighborSeedVersion: 0,
 };
 
@@ -120,17 +123,28 @@ function todayStr() {
 const NEIGHBOR_SEED_VERSION = 1;
 function ensureNeighborSeeded() {
   const s = getSettings();
-  if (s.neighborSeedVersion === NEIGHBOR_SEED_VERSION && s.neighbors.length > 0) return;
-  s.neighbors = JSON.parse(JSON.stringify(NEIGHBOR_SEED));
-  s.neighborSeedVersion = NEIGHBOR_SEED_VERSION;
+  if (s.neighborSeedVersion !== NEIGHBOR_SEED_VERSION || s.neighbors.length === 0) {
+    s.neighbors = JSON.parse(JSON.stringify(NEIGHBOR_SEED));
+    s.neighborSeedVersion = NEIGHBOR_SEED_VERSION;
+  }
+  if (s.discoverPoolSeedVersion !== NEIGHBOR_SEED_VERSION || s.discoverPool.length === 0) {
+    s.discoverPool = JSON.parse(JSON.stringify(DISCOVER_SEED));
+    s.discoverPoolSeedVersion = NEIGHBOR_SEED_VERSION;
+  }
   saveSettingsDebounced();
 }
 
-// "새 글 보기" — 내 이웃 중 한 명을 골라 AI로 새 일기를 생성, 최근 5개 피드에 반영
+const RANDOM_EMOJI_POOL = ['⚓', '🧵', '📚', '🔧', '☕', '🎹', '📰', '⏱️', '🎩', '🍷', '🕯️', '🎻', '🧭', '🗝️', '🐈', '🥂'];
+
+// "새 글 보기" — 내 이웃 중 한 명을 골라 AI로 새 일기를 생성, 최근 5개 피드에 반영 (직전과 같은 이웃은 되도록 피함)
 async function generateNeighborFeedPost() {
   const s = getSettings();
   if (s.neighbors.length === 0) return { ok: false };
-  const neighbor = s.neighbors[Math.floor(Math.random() * s.neighbors.length)];
+  let candidates = s.neighbors;
+  if (s.neighbors.length > 1 && s.lastFeedNeighborId) {
+    candidates = s.neighbors.filter(n => n.id !== s.lastFeedNeighborId);
+  }
+  const neighbor = candidates[Math.floor(Math.random() * candidates.length)];
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
   const prompt = `당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${neighbor.name}"입니다. 직업은 ${neighbor.job}, 거주구역은 ${neighbor.district}입니다. 오늘 새로 쓴 짧은 일기를 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"title":"제목","body":"본문 (2~3문장, 1인칭)"}
@@ -153,10 +167,49 @@ ${langLine}`;
     n2.posts.unshift(post);
     s2.neighborFeed.unshift({ neighborId: neighbor.id, postId: post.id });
     if (s2.neighborFeed.length > 5) s2.neighborFeed.length = 5;
+    s2.lastFeedNeighborId = neighbor.id;
     saveSettingsDebounced();
     return { ok: true };
   } catch (e) {
     console.warn('[Bellogue] 이웃 새 글 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
+// 발견 탭 새로고침 — AI로 새로운 벨 누아 주민을 한 명 만들어 발견 풀에 추가 (최대 10명, 넘으면 오래된 것부터 밀려남)
+async function generateDiscoverNeighbor() {
+  const s = getSettings();
+  const existingNames = [...s.neighbors, ...s.discoverPool].map(n => n.name).join(', ');
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = `1930년대풍 가상 도시 "벨 누아"에 사는 새로운 주민 한 명을 만들어주세요. 이미 존재하는 주민(${existingNames})과 겹치지 않는 이름으로 해주세요. 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"name":"이름(한 단어)","job":"직업(짧게)","district":"거주구역(짧게)","zodiac":"별자리","birthday":"생년월일 (예: 3월 4일)","intro":"한줄 소개 (20자 내외)","postTitle":"오늘 쓴 일기 제목","postBody":"오늘 쓴 일기 본문 (2~3문장, 1인칭)"}
+${langLine}`;
+
+  try {
+    const context = getContext();
+    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON in response');
+    const data = JSON.parse(match[0]);
+    const npc = {
+      id: 'nb_gen_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      name: data.name || '새로운 주민',
+      emoji: RANDOM_EMOJI_POOL[Math.floor(Math.random() * RANDOM_EMOJI_POOL.length)],
+      job: data.job || '', district: data.district || '', zodiac: data.zodiac || '',
+      birthday: data.birthday || '', intro: data.intro || '',
+      posts: [{
+        id: 'nbp_' + Date.now(), title: data.postTitle || '오늘 하루',
+        body: data.postBody || '별일 없이 지나간 하루였다.',
+        image: '', date: todayStr(), comments: [],
+      }],
+    };
+    const s2 = getSettings();
+    s2.discoverPool.unshift(npc);
+    if (s2.discoverPool.length > 10) s2.discoverPool.length = 10;
+    saveSettingsDebounced();
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 발견 새 주민 생성 실패:', e);
     return { ok: false };
   }
 }
@@ -252,6 +305,7 @@ function openBellogueModal() {
   dialog._mobileSub = 'profile';
   dialog._neighborView = null;
   dialog._neighborMobileSub = 'friends';
+  dialog._neighborManageMode = false;
   showCover(dialog);
   dialog.showModal();
 }
@@ -713,8 +767,9 @@ function neighborTabHtml(dialog) {
 
 function neighborListHtml(dialog, neighbors) {
   const sub = dialog._neighborMobileSub || 'friends';
-  const discoverList = DISCOVER_SEED.filter(d => !neighbors.find(n => n.id === d.id));
   const s = getSettings();
+  const discoverList = s.discoverPool.filter(d => !neighbors.find(n => n.id === d.id));
+  const manage = !!dialog._neighborManageMode;
 
   const friendRows = neighbors.map(n => `
     <div class="bellogue-neighbor-row" data-id="${n.id}">
@@ -723,7 +778,9 @@ function neighborListHtml(dialog, neighbors) {
         <p class="bellogue-post-title">${escapeHtml(n.name)}</p>
         <span class="bellogue-meta">${escapeHtml(n.job)} · ${escapeHtml(n.district)}</span>
       </div>
-      <span class="bellogue-friend-badge">✓ 이웃</span>
+      ${manage
+        ? `<span class="bellogue-post-delete bellogue-remove-friend-btn" data-id="${n.id}">삭제</span>`
+        : `<span class="bellogue-friend-badge">✓ 이웃</span>`}
     </div>
   `).join('') || `<p class="bellogue-placeholder-sm">아직 이웃이 없어요</p>`;
 
@@ -744,7 +801,7 @@ function neighborListHtml(dialog, neighbors) {
 
   const discoverRows = discoverList.map(n => `
     <div class="bellogue-neighbor-row">
-      <div class="bellogue-neighbor-emoji">${n.emoji}</div>
+      <div class="bellogue-neighbor-emoji">${n.emoji || '🌙'}</div>
       <div class="bellogue-row-main">
         <p class="bellogue-post-title">${escapeHtml(n.name)}</p>
         <span class="bellogue-meta">${escapeHtml(n.job)} · ${escapeHtml(n.district)}</span>
@@ -759,7 +816,10 @@ function neighborListHtml(dialog, neighbors) {
       <span data-sub="discover" class="${sub === 'discover' ? 'active' : ''}">발견</span>
     </div>
     <div class="bellogue-page bellogue-profile-page${sub === 'friends' ? ' bellogue-mobile-active' : ''}">
-      <span class="bellogue-section-tag" style="margin:0 0 10px;">🏘 내 이웃</span>
+      <div class="bellogue-feed-header" style="justify-content:space-between;">
+        <span class="bellogue-section-tag" style="margin:0;">🏘 내 이웃</span>
+        <span id="bellogue-neighbor-manage-btn" class="bellogue-icon-btn" title="이웃 관리"><i class="fa-solid fa-gear"></i></span>
+      </div>
       <div class="bellogue-post-list">${friendRows}</div>
 
       <div class="bellogue-feed-header" style="margin-top:22px; justify-content:space-between;">
@@ -769,7 +829,10 @@ function neighborListHtml(dialog, neighbors) {
       <div class="bellogue-post-list" id="bellogue-neighbor-feed-list">${feedRows}</div>
     </div>
     <div class="bellogue-page bellogue-feed-page${sub === 'discover' ? ' bellogue-mobile-active' : ''}">
-      <span class="bellogue-section-tag bellogue-section-tag-alt" style="margin:0 0 10px;">✨ 발견</span>
+      <div class="bellogue-feed-header" style="justify-content:space-between;">
+        <span class="bellogue-section-tag bellogue-section-tag-alt" style="margin:0;">✨ 발견</span>
+        <span id="bellogue-discover-refresh" class="bellogue-write-btn" style="background:#5E7E9C;"><i class="fa-solid fa-rotate"></i> 새로고침</span>
+      </div>
       <div class="bellogue-post-list">${discoverRows}</div>
     </div>
   `;
@@ -852,10 +915,44 @@ function wireNeighborEvents(dialog) {
     showTab(dialog, 'neighbor');
   });
 
+  const discoverRefreshBtn = scroll.querySelector('#bellogue-discover-refresh');
+  if (discoverRefreshBtn) discoverRefreshBtn.addEventListener('click', async function () {
+    if (discoverRefreshBtn.dataset.loading === '1') return;
+    discoverRefreshBtn.dataset.loading = '1';
+    const originalHtml = discoverRefreshBtn.innerHTML;
+    discoverRefreshBtn.innerHTML = '불러오는 중...';
+    const result = await generateDiscoverNeighbor();
+    if (!result.ok) {
+      discoverRefreshBtn.innerHTML = originalHtml;
+      discoverRefreshBtn.dataset.loading = '0';
+      alert('새 이웃을 불러오지 못했어요. 연결 프로필을 확인해주세요.');
+      return;
+    }
+    showTab(dialog, 'neighbor');
+  });
+
+  const manageBtn = scroll.querySelector('#bellogue-neighbor-manage-btn');
+  if (manageBtn) manageBtn.addEventListener('click', function () {
+    dialog._neighborManageMode = !dialog._neighborManageMode;
+    showTab(dialog, 'neighbor');
+  });
+
   scroll.querySelectorAll('.bellogue-neighbor-row[data-id]').forEach(row => {
     row.addEventListener('click', function (e) {
-      if (e.target.closest('.bellogue-add-friend-btn')) return;
+      if (e.target.closest('.bellogue-add-friend-btn') || e.target.closest('.bellogue-remove-friend-btn')) return;
       dialog._neighborView = { id: this.dataset.id };
+      showTab(dialog, 'neighbor');
+    });
+  });
+
+  scroll.querySelectorAll('.bellogue-remove-friend-btn').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!confirm('이 이웃을 삭제할까요?')) return;
+      const s = getSettings();
+      s.neighbors = s.neighbors.filter(n => n.id !== this.dataset.id);
+      s.neighborFeed = s.neighborFeed.filter(ref => ref.neighborId !== this.dataset.id);
+      saveSettingsDebounced();
       showTab(dialog, 'neighbor');
     });
   });
@@ -863,9 +960,9 @@ function wireNeighborEvents(dialog) {
   scroll.querySelectorAll('.bellogue-add-friend-btn').forEach(btn => {
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
-      const npc = DISCOVER_SEED.find(n => n.id === this.dataset.id);
-      if (!npc) return;
       const s = getSettings();
+      const npc = s.discoverPool.find(n => n.id === this.dataset.id);
+      if (!npc) return;
       if (!s.neighbors.find(n => n.id === npc.id)) {
         s.neighbors.push(JSON.parse(JSON.stringify(npc)));
         saveSettingsDebounced();
