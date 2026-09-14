@@ -293,7 +293,7 @@ jQuery(async () => {
           <input id="bellogue-intro" type="text" class="text_pole" placeholder="짧은 자기소개">
 
           <div class="bellogue-settings-label" style="margin-top:12px;">데이터 관리</div>
-          <button id="bellogue-reset-board" type="button" class="bellogue-btn-outline" style="margin-top:6px;">주민센터 글 초기화</button>
+          <button id="bellogue-reset-board" type="button" class="bellogue-btn-outline" style="margin-top:6px;">벨로그 데이터 전체 초기화</button>
 
         </div>
       </div>
@@ -322,12 +322,11 @@ jQuery(async () => {
   });
 
   $('#bellogue-reset-board').on('click', function () {
-    if (!confirm('주민센터에 쌓인 글과 댓글을 전부 지울까요? (내 벨로그·이웃 벨로그는 그대로 남아요)')) return;
-    settings.boardPosts = [];
-    settings.savedBoardPostIds = [];
-    settings.lastBoardAuthor = '';
+    if (!confirm('벨로그 안의 모든 데이터(내 글, 프로필, 이웃, 주민센터 글 등)를 전부 지우고 처음 상태로 되돌릴까요? 이 작업은 되돌릴 수 없어요.')) return;
+    delete extension_settings[extensionName];
+    getSettings();
     saveSettingsDebounced();
-    alert('주민센터 글을 모두 지웠어요.');
+    alert('벨로그 데이터를 전부 초기화했어요. 확장프로그램을 다시 열어보세요.');
   });
 });
 
@@ -1131,12 +1130,17 @@ function capBoardPosts(s) {
 
 // 전체 새로고침 — 모든 게시판에 한 번씩 새 글을 생성
 async function refreshAllBoards() {
-  let anyOk = false;
-  for (const b of BOARD_DEFS) {
-    const result = await generateBoardPost(b.id);
-    if (result.ok) anyOk = true;
+  const queue = [...BOARD_DEFS];
+  const results = [];
+  const CONCURRENCY = 2;
+  async function worker() {
+    while (queue.length) {
+      const b = queue.shift();
+      results.push(await generateBoardPost(b.id));
+    }
   }
-  return { ok: anyOk };
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  return { ok: results.some(r => r.ok) };
 }
 
 // 주민센터 글에 유저가 댓글을 달면, 작성자가 짧게 답글을 다는 AI 함수
