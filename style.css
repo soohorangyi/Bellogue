@@ -90,6 +90,7 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 /* 피드 (목록) */
 .bellogue-feed-header { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-bottom: 10px; }
 .bellogue-icon-btn { font-size: 17px; color: var(--bn-ink-soft); cursor: pointer; }
+.bellogue-icon-btn.bellogue-icon-active { color: var(--bn-accent); }
 .bellogue-write-btn { font-size: 11px; background: var(--bn-accent); color: var(--bn-paper); border-radius: 2px; padding: 7px 14px; font-weight: 600; cursor: pointer; }
 
 .bellogue-post-row { display: flex; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 0.5px solid var(--bn-line); cursor: pointer; }
