@@ -149,6 +149,8 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-neighbor-head { display: flex; align-items: center; gap: 12px; }
 .bellogue-neighbor-avatar { width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .bellogue-friend-badge { margin-left: auto; font-size: 10px; color: var(--bn-accent); border: 0.5px solid var(--bn-accent); border-radius: 2px; padding: 3px 7px; white-space: nowrap; }
+.bellogue-add-friend-btn { margin-left: auto; font-size: 10px; color: var(--bn-paper); background: #5E7E9C; border-radius: 2px; padding: 4px 8px; white-space: nowrap; cursor: pointer; }
+.bellogue-section-tag-alt { background: #5E7E9C; }
 .bellogue-comment-form { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 0.5px solid #EFE9DC; }
 .bellogue-comment-input { flex: 1; box-sizing: border-box; border: 0.5px solid var(--bn-line); border-radius: 2px; font-family: inherit; font-size: 11.5px; padding: 7px 9px; color: var(--bn-ink); background: var(--bn-paper); }
 
