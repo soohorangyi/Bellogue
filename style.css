@@ -46,8 +46,7 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 
 /* 표지 */
 .bellogue-cover { width: 100%; min-height: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 0 24px; }
-.bellogue-cover-icon { width: 46px; height: 46px; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
-.bellogue-cover-icon svg { width: 22px; height: 22px; }
+.bellogue-cover-icon { width: 46px; height: 46px; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 19px; }
 .bellogue-cover-rule { width: 28px; height: 1px; background: var(--bn-border); margin: 0 0 16px; }
 .bellogue-logo { font-size: 23px; font-weight: 600; letter-spacing: 1px; margin: 0 0 22px; }
 .bellogue-open-btn { font-family: 'Noto Serif KR', serif; font-size: 13px; letter-spacing: 2px; border-radius: 2px; padding: 11px 28px; cursor: pointer; background: var(--bn-accent); color: var(--bn-paper); font-weight: 600; border: none; }
@@ -101,7 +100,7 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* 글 상세보기 */
-.bellogue-post { padding: 0; }
+.bellogue-post { padding: 20px; }
 .bellogue-post-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 14px; }
 .bellogue-post-title { margin: 0; font-size: 13px; font-weight: 600; }
 .bellogue-post-head-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
