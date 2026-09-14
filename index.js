@@ -68,6 +68,8 @@ const DISCOVER_SEED = [
   },
 ];
 
+const BOARD_TOPICS = ['잡담', '질문', '정보공유', '후기'];
+
 const defaultSettings = {
   nickname: "",
   colorTheme: "burgundy",
@@ -86,6 +88,8 @@ const defaultSettings = {
   discoverPool: [],     // 발견 탭에 보여줄 NPC 풀, 최대 10명
   discoverPoolSeedVersion: 0,
   neighborSeedVersion: 0,
+  boardPosts: [],        // [{ id, topic, title, body, author, date, comments:[] }]
+  lastBoardAuthor: "",
 };
 
 function getSettings() {
@@ -306,6 +310,7 @@ function openBellogueModal() {
   dialog._neighborView = null;
   dialog._neighborMobileSub = 'friends';
   dialog._neighborManageMode = false;
+  dialog._boardView = null;
   showCover(dialog);
   dialog.showModal();
 }
@@ -371,7 +376,8 @@ function showTab(dialog, name) {
   renderIndexTabs(dialog, name);
   const scroll = dialog.querySelector('#bellogue-scroll');
   if (name === 'board') {
-    scroll.innerHTML = boardHtml();
+    scroll.innerHTML = boardHtml(dialog);
+    wireBoardEvents(dialog);
   } else if (name === 'neighbor') {
     scroll.innerHTML = neighborTabHtml(dialog);
     wireNeighborEvents(dialog);
@@ -1027,15 +1033,172 @@ function wireNeighborEvents(dialog) {
 }
 
 
-function boardHtml() {
+// 주민센터 "새 글 보기" — 벨 누아 주민 전반 중 아무나 한 명이 새 글을 올림
+async function generateBoardPost() {
+  const s = getSettings();
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const avoidAuthor = s.lastBoardAuthor ? `직전 작성자("${s.lastBoardAuthor}")와는 다른 사람이어야 합니다.` : '';
+  const prompt = `1930년대풍 가상 도시 "벨 누아"의 공용 게시판(주민센터)에 올라올 법한 글 하나를 만들어주세요. 작성자는 이 도시에 사는 아무 주민이나 상관없습니다. ${avoidAuthor}
+주제는 "${BOARD_TOPICS.join('/')}" 중 하나를 고르세요.
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"author":"작성자 이름","topic":"${BOARD_TOPICS.join('|')} 중 하나","title":"제목","body":"본문 (2~4문장)"}
+${langLine}`;
+
+  try {
+    const context = getContext();
+    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON in response');
+    const data = JSON.parse(match[0]);
+    const post = {
+      id: 'bp_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      author: data.author || '익명의 주민',
+      topic: BOARD_TOPICS.includes(data.topic) ? data.topic : BOARD_TOPICS[Math.floor(Math.random() * BOARD_TOPICS.length)],
+      title: data.title || '오늘의 이야기',
+      body: data.body || '별일 없이 지나간 하루였다.',
+      date: todayStr(), comments: [],
+    };
+    const s2 = getSettings();
+    s2.boardPosts.unshift(post);
+    if (s2.boardPosts.length > 20) s2.boardPosts.length = 20;
+    s2.lastBoardAuthor = post.author;
+    saveSettingsDebounced();
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 주민센터 새 글 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
+// 주민센터 글에 유저가 댓글을 달면, 작성자가 짧게 답글을 다는 AI 함수
+async function generateBoardReply(post, userComment) {
+  const s = getSettings();
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = `당신은 1930년대풍 가상 도시 "벨 누아"의 주민 "${post.author}"입니다. 주민센터 게시판에 "${post.title}" (${post.body})라는 글을 올렸습니다.
+누군가 이런 댓글을 남겼습니다: "${userComment}"
+이 댓글에 짧게(1문장) 답글을 남기세요. 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"reply":"답글 내용"}
+${langLine}`;
+  try {
+    const context = getContext();
+    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON in response');
+    const data = JSON.parse(match[0]);
+    if (!data.reply) throw new Error('empty reply');
+    return { ok: true, reply: data.reply };
+  } catch (e) {
+    console.warn('[Bellogue] 주민센터 답글 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
+// ── 주민센터 ─────────────────────────────────────────────────
+function boardHtml(dialog) {
+  const s = getSettings();
+  const viewId = dialog._boardView;
+  if (viewId) {
+    const post = s.boardPosts.find(p => p.id === viewId);
+    if (post) return boardPostDetailHtml(post);
+  }
+  const rows = s.boardPosts.map(p => `
+    <div class="bellogue-board-row" data-id="${p.id}">
+      <span class="bellogue-stamp">${escapeHtml(p.topic)}</span>
+      <span class="bellogue-row-title">${escapeHtml(p.title)}</span>
+      <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
+    </div>
+  `).join('') || `<p class="bellogue-placeholder">아직 올라온 글이 없어요.<br>새 글 보기를 눌러보세요.</p>`;
+
   return `
     <div class="bellogue-board">
-      <div class="bellogue-board-header">
-        <button class="bellogue-write-btn">글쓰기</button>
+      <div class="bellogue-feed-header" style="justify-content:space-between;">
+        <span class="bellogue-section-tag" style="margin:0;">🏛 주민센터</span>
+        <span id="bellogue-board-refresh" class="bellogue-refresh-btn" title="새 글 보기"><i class="fa-solid fa-rotate"></i></span>
       </div>
-      <div class="bellogue-board-list">
-        <p class="bellogue-placeholder">주민센터 (준비 중)</p>
+      <div class="bellogue-board-list">${rows}</div>
+    </div>
+  `;
+}
+
+function boardPostDetailHtml(post) {
+  const bodyHtml = post.body.split(/\n+/).map(p => p.trim()).filter(Boolean)
+    .map((p, i) => `<p class="bellogue-post-para${i === 0 ? ' bellogue-dropcap' : ''}">${escapeHtml(p)}</p>`).join('');
+  const commentsList = (post.comments || []).map(c => `
+    <div class="bellogue-comment-row${c.replyTo ? ' bellogue-comment-reply' : ''}"><p>${c.replyTo ? '<i class="fa-solid fa-reply" style="font-size:9px;color:var(--bn-muted);margin-right:4px;"></i>' : ''}<span class="bellogue-comment-name">${escapeHtml(c.name)}</span> ${escapeHtml(c.text)}</p></div>`).join('');
+
+  return `
+    <div class="bellogue-post">
+      <p id="bellogue-board-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 목록으로</p>
+      <div class="bellogue-post-headrow">
+        <span class="bellogue-meta-badge">${escapeHtml(post.topic)}</span>
+      </div>
+      <p class="bellogue-post-title-lg">${escapeHtml(post.title)}</p>
+      <p class="bellogue-post-subtitle">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</p>
+      <div class="bellogue-post-body">${bodyHtml}</div>
+      <div class="bellogue-comments-box">
+        <div class="bellogue-section-tag">💬 댓글 ${(post.comments || []).length}</div>
+        ${commentsList}
+        <div class="bellogue-comment-form">
+          <input type="text" id="bellogue-board-comment-input" class="bellogue-comment-input" placeholder="댓글을 남겨보세요">
+          <button id="bellogue-board-comment-submit" class="bellogue-btn-primary" type="button">등록</button>
+        </div>
       </div>
     </div>
   `;
+}
+
+function wireBoardEvents(dialog) {
+  const scroll = dialog.querySelector('#bellogue-scroll');
+
+  const refreshBtn = scroll.querySelector('#bellogue-board-refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', async function () {
+    if (refreshBtn.dataset.loading === '1') return;
+    refreshBtn.dataset.loading = '1';
+    refreshBtn.classList.add('bellogue-spin');
+    const result = await generateBoardPost();
+    if (!result.ok) {
+      refreshBtn.classList.remove('bellogue-spin');
+      refreshBtn.dataset.loading = '0';
+      alert('새 글을 불러오지 못했어요. 연결 프로필을 확인해주세요.');
+      return;
+    }
+    showTab(dialog, 'board');
+  });
+
+  scroll.querySelectorAll('.bellogue-board-row').forEach(row => {
+    row.addEventListener('click', function () {
+      dialog._boardView = this.dataset.id;
+      showTab(dialog, 'board');
+    });
+  });
+
+  const backEl = scroll.querySelector('#bellogue-board-back');
+  if (backEl) backEl.addEventListener('click', () => { dialog._boardView = null; showTab(dialog, 'board'); });
+
+  const submitBtn = scroll.querySelector('#bellogue-board-comment-submit');
+  if (submitBtn) submitBtn.addEventListener('click', async function () {
+    const input = scroll.querySelector('#bellogue-board-comment-input');
+    const text = input.value.trim();
+    if (!text) return;
+    if (submitBtn.dataset.loading === '1') return;
+
+    const s = getSettings();
+    const post = s.boardPosts.find(p => p.id === dialog._boardView);
+    post.comments = post.comments || [];
+    const userComment = { id: 'c_' + Date.now(), name: s.nickname || '나', text };
+    post.comments.push(userComment);
+    saveSettingsDebounced();
+
+    submitBtn.dataset.loading = '1';
+    submitBtn.innerHTML = '<i class="fa-solid fa-rotate bellogue-spin"></i>';
+    submitBtn.disabled = true;
+    const result = await generateBoardReply(post, text);
+    if (result.ok) {
+      const s2 = getSettings();
+      const p2 = s2.boardPosts.find(p => p.id === post.id);
+      p2.comments.push({ id: 'c_' + Date.now() + '_r', name: post.author, text: result.reply, replyTo: userComment.id });
+      saveSettingsDebounced();
+    }
+    showTab(dialog, 'board');
+  });
 }
