@@ -144,6 +144,8 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-crop-zoom { width: 80%; margin: 16px auto 0; display: block; }
 
 /* 이웃 벨로그 */
+.bellogue-neighbor-row { display: flex; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 0.5px solid var(--bn-line); cursor: pointer; }
+.bellogue-neighbor-emoji { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; background: var(--bn-accent-tint); display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .bellogue-neighbor-head { display: flex; align-items: center; gap: 12px; }
 .bellogue-neighbor-avatar { width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .bellogue-friend-badge { margin-left: auto; font-size: 10px; color: var(--bn-accent); border: 0.5px solid var(--bn-accent); border-radius: 2px; padding: 3px 7px; white-space: nowrap; }
