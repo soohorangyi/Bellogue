@@ -342,6 +342,7 @@ function openBellogueModal() {
   dialog._boardView = null;
   dialog._boardTab = 'free';
   dialog._boardWriteOpen = false;
+  dialog._boardWriteDraft = null;
   dialog._boardShowSaved = false;
   showCover(dialog);
   dialog.showModal();
@@ -1236,13 +1237,24 @@ function boardWriteHtml(dialog) {
   const boardTab = dialog._boardTab || 'free';
   const topics = BOARD_TOPIC_MAP[boardTab] || [];
   const topicOptions = topics.map(t => `<option value="${t}">${t}</option>`).join('');
+  const draft = dialog._boardWriteDraft || {};
+  const pendingImage = draft.image || '';
+  const thumbHtml = pendingImage
+    ? `<div id="bellogue-board-write-thumb" class="bellogue-write-thumb" style="background-image:url('${pendingImage}')"><span class="bellogue-write-thumb-edit">변경</span></div>`
+    : `<button id="bellogue-board-write-image-btn" class="bellogue-btn-outline" type="button">이미지 첨부</button>`;
+
   return `
-    <div class="bellogue-write">
+    <div class="bellogue-write" style="padding:20px;">
       <p id="bellogue-board-write-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 뒤로</p>
       <p class="bellogue-settings-label" style="margin:0 0 14px;">${escapeHtml(BOARD_DEFS.find(b => b.id === boardTab).name)}에 글쓰기</p>
-      ${topics.length ? `<select id="bellogue-board-write-topic" class="text_pole" style="margin-bottom:14px;">${topicOptions}</select>` : ''}
-      <input id="bellogue-board-write-title" type="text" class="bellogue-write-title-input" placeholder="제목을 입력하세요">
-      <textarea id="bellogue-board-write-body" class="bellogue-write-textarea" placeholder="내용을 입력하세요..."></textarea>
+      ${topics.length ? `
+      <select id="bellogue-board-write-topic" class="bellogue-select">${topicOptions}<option value="__custom__">직접 입력</option></select>
+      <input id="bellogue-board-write-topic-custom" type="text" class="bellogue-write-title-input" placeholder="말머리를 입력하세요" style="display:none;">
+      ` : ''}
+      <input id="bellogue-board-write-title" type="text" class="bellogue-write-title-input" placeholder="제목을 입력하세요" value="${escapeHtml(draft.title || '')}">
+      <textarea id="bellogue-board-write-body" class="bellogue-write-textarea" placeholder="내용을 입력하세요...">${escapeHtml(draft.body || '')}</textarea>
+      <input type="file" id="bellogue-board-write-image-input" accept="image/*" style="display:none;">
+      <div class="bellogue-write-image-row">${thumbHtml}</div>
       <div class="bellogue-write-actions">
         <button id="bellogue-board-write-submit" class="bellogue-btn-primary" type="button">등록</button>
       </div>
@@ -1269,6 +1281,7 @@ function boardPostDetailHtml(dialog, post) {
       </div>
       <p class="bellogue-post-title-lg">${escapeHtml(post.title)}</p>
       <p class="bellogue-post-subtitle">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</p>
+      ${post.image ? `<div class="bellogue-post-image" style="background-image:url('${post.image}')"></div>` : ''}
       <div class="bellogue-post-body">${bodyHtml}</div>
       <div class="bellogue-comments-box">
         <div class="bellogue-section-tag">💬 댓글 ${(post.comments || []).length}</div>
@@ -1317,30 +1330,75 @@ function wireBoardEvents(dialog) {
   const writeBtn = scroll.querySelector('#bellogue-board-write-btn');
   if (writeBtn) writeBtn.addEventListener('click', function () {
     dialog._boardWriteOpen = true;
+    dialog._boardWriteDraft = null;
     showTab(dialog, 'board');
   });
   const writeBack = scroll.querySelector('#bellogue-board-write-back');
   if (writeBack) writeBack.addEventListener('click', function () {
     dialog._boardWriteOpen = false;
+    dialog._boardWriteDraft = null;
     showTab(dialog, 'board');
   });
+
+  const topicSel = scroll.querySelector('#bellogue-board-write-topic');
+  const topicCustom = scroll.querySelector('#bellogue-board-write-topic-custom');
+  if (topicSel && topicCustom) {
+    topicSel.addEventListener('change', function () {
+      topicCustom.style.display = this.value === '__custom__' ? 'block' : 'none';
+    });
+  }
+
+  const imgBtn = scroll.querySelector('#bellogue-board-write-image-btn');
+  const imgThumb = scroll.querySelector('#bellogue-board-write-thumb');
+  const imgInput = scroll.querySelector('#bellogue-board-write-image-input');
+  function openBoardImagePicker() { imgInput.click(); }
+  if (imgBtn) imgBtn.addEventListener('click', openBoardImagePicker);
+  if (imgThumb) imgThumb.addEventListener('click', openBoardImagePicker);
+  if (imgInput) imgInput.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    if (!dialog.open) dialog.showModal();
+    const curTitle = scroll.querySelector('#bellogue-board-write-title').value;
+    const curBody = scroll.querySelector('#bellogue-board-write-body').value;
+    const reader = new FileReader();
+    reader.onload = () => showImageCropper(dialog, reader.result, 300, 200, 640, 420,
+      (dataUrl) => {
+        dialog._boardWriteDraft = { title: curTitle, body: curBody, image: dataUrl };
+        dialog._boardWriteOpen = true;
+        showTab(dialog, 'board');
+      },
+      () => {
+        dialog._boardWriteDraft = { title: curTitle, body: curBody, image: dialog._boardWriteDraft?.image || '' };
+        dialog._boardWriteOpen = true;
+        showTab(dialog, 'board');
+      }
+    );
+    reader.readAsDataURL(file);
+  });
+
   const writeSubmit = scroll.querySelector('#bellogue-board-write-submit');
   if (writeSubmit) writeSubmit.addEventListener('click', function () {
     const title = scroll.querySelector('#bellogue-board-write-title').value.trim();
     const body = scroll.querySelector('#bellogue-board-write-body').value.trim();
     if (!title || !body) { alert('제목과 내용을 모두 입력해주세요.'); return; }
-    const topicEl = scroll.querySelector('#bellogue-board-write-topic');
+    let topic = '';
+    if (topicSel) {
+      topic = topicSel.value === '__custom__' ? topicCustom.value.trim() : topicSel.value;
+    }
     const s = getSettings();
     s.boardPosts.unshift({
       id: 'bp_' + Date.now(),
       boardId: dialog._boardTab || 'free',
       author: s.nickname || '나',
-      topic: topicEl ? topicEl.value : '',
-      title, body, date: todayStr(), comments: [],
+      topic,
+      title, body,
+      image: dialog._boardWriteDraft?.image || '',
+      date: todayStr(), comments: [],
     });
     capBoardPosts(s);
     saveSettingsDebounced();
     dialog._boardWriteOpen = false;
+    dialog._boardWriteDraft = null;
     showTab(dialog, 'board');
   });
 
