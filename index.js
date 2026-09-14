@@ -78,6 +78,10 @@ const BOARD_DEFS = [
 ];
 const BOARD_TOPIC_MAP = { notice: [], suggest: [], free: BOARD_TOPICS, job: ['구인', '구직'], market: ['팝니다', '삽니다'] };
 
+const ERA_RULE = '중요: 이 글/답글은 반드시 1930~1940년대 가상 도시 "벨 누아"의 세계관 안에서만 작성되어야 합니다. 인터넷, 컴퓨터, 스마트폰, API, 앱, 소프트웨어, SNS, 현대 브랜드 등 21세기적인 개념이나 단어는 절대 언급하지 마세요. 편지, 신문, 전보, 축음기, 자동차, 재봉틀 같은 그 시대에 맞는 소재만 사용하세요.';
+
+const WORLD_GUARD = '아주 중요한 규칙: 당신은 1930~1940년대풍 가상 도시 "벨 누아"의 세계관 안에서만 존재합니다. 인터넷, 스마트폰, 컴퓨터, 앱, API, 전자기기, 게임, SNS, 현대 정치·연예인 등 21세기 현실 요소는 절대 언급하거나 암시하지 마세요. 오직 그 시대에 어울리는 소재(거리, 날씨, 사람, 소문, 생업, 사교 등)만 다루세요.';
+
 const defaultSettings = {
   nickname: "",
   colorTheme: "burgundy",
@@ -159,8 +163,10 @@ async function generateNeighborFeedPost() {
   }
   const neighbor = candidates[Math.floor(Math.random() * candidates.length)];
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
-  const prompt = `당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${neighbor.name}"입니다. 직업은 ${neighbor.job}, 거주구역은 ${neighbor.district}입니다. 오늘 새로 쓴 짧은 일기를 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+  const prompt = `${WORLD_GUARD}
+당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${neighbor.name}"입니다. 직업은 ${neighbor.job}, 거주구역은 ${neighbor.district}입니다. 오늘 새로 쓴 짧은 일기를 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"title":"제목","body":"본문 (2~3문장, 1인칭)"}
+${ERA_RULE}
 ${langLine}`;
 
   try {
@@ -194,10 +200,12 @@ async function generateDiscoverNeighbor() {
   const s = getSettings();
   const existingNames = [...s.neighbors, ...s.discoverPool].map(n => n.name).join(', ');
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
-  const prompt = `1930년대풍 가상 도시 "벨 누아"에 사는 새로운 주민 한 명을 만들어주세요. 이미 존재하는 주민(${existingNames})과 겹치지 않는 이름으로 해주세요.
+  const prompt = `${WORLD_GUARD}
+1930년대풍 가상 도시 "벨 누아"에 사는 새로운 주민 한 명을 만들어주세요. 이미 존재하는 주민(${existingNames})과 겹치지 않는 이름으로 해주세요.
 이름은 반드시 서구풍 1930년대 분위기로 지어주세요 (예: 레이븐, 모라, 실비아, 테오, 이든, 베티, 클라라, 안톤 같은 느낌). 현실적인 한국 이름이나 실존 인물, 유명인 이름은 절대 쓰지 마세요.
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"name":"이름(한 단어)","job":"직업(짧게)","district":"거주구역(짧게)","zodiac":"별자리","birthday":"생년월일 (예: 3월 4일)","intro":"한줄 소개 (20자 내외)","postTitle":"오늘 쓴 일기 제목","postBody":"오늘 쓴 일기 본문 (2~3문장, 1인칭)"}
+${ERA_RULE}
 ${langLine}`;
 
   try {
@@ -906,10 +914,12 @@ function neighborVisitHtml(neighbor, postId) {
 async function generateNeighborReply(neighbor, post, userComment) {
   const s = getSettings();
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
-  const prompt = `당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${neighbor.name}"입니다. 직업은 ${neighbor.job}입니다.
+  const prompt = `${WORLD_GUARD}
+당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${neighbor.name}"입니다. 직업은 ${neighbor.job}입니다.
 당신이 쓴 글 "${post.title}" (${post.body})에 누군가 이런 댓글을 남겼습니다: "${userComment}"
 이 댓글에 짧게(1문장) 답글을 남기세요. 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"reply":"답글 내용"}
+${ERA_RULE}
 ${langLine}`;
   try {
     const context = getContext();
@@ -1047,17 +1057,8 @@ function wireNeighborEvents(dialog) {
 }
 
 
-// 최근 유저 채팅 내용을 살짝 참고용으로 가져옴 (실패해도 무시)
-function getRecentChatSnippet() {
-  try {
-    const context = getContext();
-    const chat = context.chat || [];
-    if (!chat.length) return '';
-    return chat.slice(-4).map(m => `${m.name}: ${m.mes}`).join('\n').slice(0, 500);
-  } catch (e) {
-    return '';
-  }
-}
+// (이전에는 최근 채팅 내용을 프롬프트에 그대로 끼워넣었지만, 21세기적 내용이 새어 들어오는
+// 문제가 있어 제거했습니다. 대신 아래 WORLD_GUARD로 시대 일관성을 강하게 못박습니다.)
 
 // 주민센터 "새 글 보기" — 지정한 게시판에 벨 누아 주민 아무나 한 명이 새 글을 올림
 async function generateBoardPost(boardId) {
@@ -1070,15 +1071,14 @@ async function generateBoardPost(boardId) {
     ? '작성자는 "벨 누아 시청" 또는 그에 준하는 관리 기관 이름으로 하세요.'
     : `작성자 이름은 반드시 서구풍 1930년대 분위기의 이름으로 지어주세요 (예: 레이븐, 모라, 실비아, 테오, 이든, 베티, 클라라, 안톤 같은 느낌). 현실적인 한국 이름이나 실존 인물, 유명인 이름은 절대 쓰지 마세요. ${avoidAuthor}`;
   const topicLine = topics.length ? `주제는 "${topics.join('/')}" 중 하나를 고르세요.` : '';
-  const chatSnippet = getRecentChatSnippet();
-  const chatLine = chatSnippet ? `참고(직접 언급하지 말고 분위기만 은은하게 참고하세요): """${chatSnippet}"""` : '';
 
-  const prompt = `1930년대풍 가상 도시 "벨 누아"의 "${boardDef.name}" 게시판에 올라올 법한 글 하나를 만들어주세요.
+  const prompt = `${WORLD_GUARD}
+1930년대풍 가상 도시 "벨 누아"의 "${boardDef.name}" 게시판에 올라올 법한 글 하나를 만들어주세요.
 ${nameRule}
 ${topicLine}
-${chatLine}
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"author":"작성자 이름","topic":"${topics.length ? topics.join('|') : '(없으면 빈 문자열)'}","title":"제목","body":"본문 (2~4문장)"}
+${ERA_RULE}
 ${langLine}`;
 
   try {
@@ -1132,10 +1132,12 @@ async function refreshAllBoards() {
 async function generateBoardReply(post, userComment) {
   const s = getSettings();
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
-  const prompt = `당신은 1930년대풍 가상 도시 "벨 누아"의 주민 "${post.author}"입니다. 주민센터 게시판에 "${post.title}" (${post.body})라는 글을 올렸습니다.
+  const prompt = `${WORLD_GUARD}
+당신은 1930년대풍 가상 도시 "벨 누아"의 주민 "${post.author}"입니다. 주민센터 게시판에 "${post.title}" (${post.body})라는 글을 올렸습니다.
 누군가 이런 댓글을 남겼습니다: "${userComment}"
 이 댓글에 짧게(1문장) 답글을 남기세요. 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"reply":"답글 내용"}
+${ERA_RULE}
 ${langLine}`;
   try {
     const context = getContext();
@@ -1178,7 +1180,7 @@ function boardHtml(dialog) {
     const saved = s.boardPosts.filter(p => s.savedBoardPostIds.includes(p.id));
     const rows = saved.map(p => `
       <div class="bellogue-board-row" data-id="${p.id}">
-        ${p.topic ? `<span class="bellogue-stamp">${escapeHtml(p.topic)}</span>` : ''}
+        ${(p.boardId || 'free') === 'notice' ? `<span class="bellogue-stamp">관리자</span>` : (p.topic ? `<span class="bellogue-stamp">${escapeHtml(p.topic)}</span>` : '')}
         <span class="bellogue-row-title">${escapeHtml(p.title)}</span>
         <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
       </div>
@@ -1190,10 +1192,11 @@ function boardHtml(dialog) {
     `<a data-board="${b.id}" class="${b.id === boardTab ? 'active' : ''}">${b.name}</a>`
   ).join('');
 
+  const canWrite = boardTab !== 'notice' && boardTab !== 'suggest';
   const boardPosts = s.boardPosts.filter(p => (p.boardId || 'free') === boardTab);
   const rows = boardPosts.map(p => `
     <div class="bellogue-board-row" data-id="${p.id}">
-      ${p.topic ? `<span class="bellogue-stamp">${escapeHtml(p.topic)}</span>` : ''}
+      ${boardTab === 'notice' ? `<span class="bellogue-stamp">관리자</span>` : (p.topic ? `<span class="bellogue-stamp">${escapeHtml(p.topic)}</span>` : '')}
       <span class="bellogue-row-title">${escapeHtml(p.title)}</span>
       <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
     </div>
@@ -1203,9 +1206,10 @@ function boardHtml(dialog) {
     <div class="bellogue-board">
       ${topBar}
       <nav class="bellogue-nav" style="margin:12px 0;">${navHtml}</nav>
+      ${canWrite ? `
       <div class="bellogue-feed-header" style="justify-content:flex-end; margin-bottom:8px;">
         <span id="bellogue-board-write-btn" class="bellogue-write-btn"><i class="fa-solid fa-feather"></i> 글쓰기</span>
-      </div>
+      </div>` : ''}
       <div class="bellogue-board-list">${rows}</div>
     </div>
   `;
@@ -1244,7 +1248,7 @@ function boardPostDetailHtml(dialog, post) {
         <span id="bellogue-board-save-toggle" class="bellogue-icon-btn" title="보관"><i class="${isSaved ? 'fa-solid' : 'fa-regular'} fa-bookmark"></i></span>
       </div>
       <div class="bellogue-post-headrow" style="margin-top:14px;">
-        ${post.topic ? `<span class="bellogue-meta-badge">${escapeHtml(post.topic)}</span>` : ''}
+        ${post.boardId === 'notice' ? `<span class="bellogue-meta-badge">관리자</span>` : (post.topic ? `<span class="bellogue-meta-badge">${escapeHtml(post.topic)}</span>` : '')}
       </div>
       <p class="bellogue-post-title-lg">${escapeHtml(post.title)}</p>
       <p class="bellogue-post-subtitle">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</p>
