@@ -102,7 +102,7 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* 글 상세보기 */
-.bellogue-post { padding: 20px; }
+.bellogue-post { width: 100%; box-sizing: border-box; padding: 20px; }
 .bellogue-post-headrow { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
 .bellogue-meta-badge { font-size: 9.5px; color: var(--bn-paper); background: var(--bn-accent); border-radius: 2px; padding: 3px 8px; font-weight: 600; letter-spacing: 0.5px; }
 .bellogue-post-edit, .bellogue-post-delete, .bellogue-comment-delete {
