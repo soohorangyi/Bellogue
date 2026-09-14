@@ -292,13 +292,15 @@ jQuery(async () => {
           <label for="bellogue-intro">한줄 소개</label>
           <input id="bellogue-intro" type="text" class="text_pole" placeholder="짧은 자기소개">
 
+          <div class="bellogue-settings-label" style="margin-top:12px;">데이터 관리</div>
+          <button id="bellogue-reset-board" type="button" class="bellogue-btn-outline" style="margin-top:6px;">주민센터 글 초기화</button>
+
         </div>
       </div>
     </div>
   `);
 
-  const fields = ['nickname', 'birthday', 'zodiac', 'district', 'job', 'intro'];
-  fields.forEach(f => {
+  const fields = ['nickname', 'birthday', 'zodiac', 'district', 'job', 'intro'];  fields.forEach(f => {
     $(`#bellogue-${f}`).val(settings[f]).on('input', function () {
       settings[f] = $(this).val();
       saveSettingsDebounced();
@@ -317,6 +319,15 @@ jQuery(async () => {
   $('#bellogue-connection-profile').val(settings.connectionProfile).on('change', function () {
     settings.connectionProfile = $(this).val();
     saveSettingsDebounced();
+  });
+
+  $('#bellogue-reset-board').on('click', function () {
+    if (!confirm('주민센터에 쌓인 글과 댓글을 전부 지울까요? (내 벨로그·이웃 벨로그는 그대로 남아요)')) return;
+    settings.boardPosts = [];
+    settings.savedBoardPostIds = [];
+    settings.lastBoardAuthor = '';
+    saveSettingsDebounced();
+    alert('주민센터 글을 모두 지웠어요.');
   });
 });
 
