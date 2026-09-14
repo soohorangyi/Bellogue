@@ -1143,7 +1143,67 @@ async function refreshAllBoards() {
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  return { ok: results.some(r => r.ok) };
+  const reaction = await generateOneCommunityReaction();
+  return { ok: results.some(r => r.ok) || reaction.ok };
+}
+
+// 내가 쓴 글이나 댓글에, 다른 주민이 댓글·대댓글을 하나 남겨줌
+async function generateOneCommunityReaction() {
+  const s = getSettings();
+  const myName = s.nickname || '나';
+
+  const candidates = [];
+  s.boardPosts.forEach(p => {
+    if (p.author === myName && (p.comments || []).length < 3) candidates.push({ type: 'post', post: p });
+    (p.comments || []).forEach(c => {
+      if (c.name === myName) candidates.push({ type: 'reply', post: p, comment: c });
+    });
+  });
+  if (!candidates.length) return { ok: false };
+
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = pick.type === 'post'
+    ? `${WORLD_GUARD}
+다른 벨 누아 주민 한 명이 되어, 아래 게시글에 짧은 댓글을 하나 남겨주세요.
+제목: ${pick.post.title}
+내용: ${pick.post.body}
+작성자 이름은 반드시 서구풍 1930년대 분위기로 지어주세요(레이븐, 모라, 실비아, 테오 같은 느낌). 실존 인물·유명인 이름 금지.
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"name":"댓글 작성자 이름","text":"댓글 내용 (1문장)"}
+${ERA_RULE}
+${langLine}`
+    : `${WORLD_GUARD}
+다른 벨 누아 주민 한 명이 되어(글쓴이 "${pick.post.author}"는 제외하고), 아래 댓글에 짧게 대댓글을 남겨주세요.
+게시글 제목: ${pick.post.title}
+댓글: "${pick.comment.text}"
+작성자 이름은 반드시 서구풍 1930년대 분위기로 지어주세요(레이븐, 모라, 실비아, 테오 같은 느낌). 실존 인물·유명인 이름 금지.
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"name":"작성자 이름","text":"대댓글 내용 (1문장)"}
+${ERA_RULE}
+${langLine}`;
+
+  try {
+    const context = getContext();
+    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON in response');
+    const data = JSON.parse(match[0]);
+    const newComment = { id: 'c_' + Date.now() + '_react', name: data.name || '익명의 주민', text: data.text || '...' };
+    if (pick.type === 'reply') newComment.replyTo = pick.comment.id;
+
+    const s2 = getSettings();
+    const p2 = s2.boardPosts.find(p => p.id === pick.post.id);
+    if (p2) {
+      p2.comments = p2.comments || [];
+      p2.comments.push(newComment);
+      saveSettingsDebounced();
+    }
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 주민 반응 생성 실패:', e);
+    return { ok: false };
+  }
 }
 
 // 주민센터 글에 유저가 댓글을 달면, 작성자가 짧게 답글을 다는 AI 함수
@@ -1246,7 +1306,7 @@ function boardWriteHtml(dialog) {
   return `
     <div class="bellogue-write" style="padding:20px;">
       <p id="bellogue-board-write-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 뒤로</p>
-      <p class="bellogue-settings-label" style="margin:0 0 14px;">${escapeHtml(BOARD_DEFS.find(b => b.id === boardTab).name)}에 글쓰기</p>
+      <span class="bellogue-section-tag" style="margin:0 0 16px;">✍ ${escapeHtml(BOARD_DEFS.find(b => b.id === boardTab).name)}에 글쓰기</span>
       ${topics.length ? `
       <select id="bellogue-board-write-topic" class="bellogue-select">${topicOptions}<option value="__custom__">직접 입력</option></select>
       <input id="bellogue-board-write-topic-custom" type="text" class="bellogue-write-title-input" placeholder="말머리를 입력하세요" style="display:none;">
