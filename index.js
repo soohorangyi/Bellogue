@@ -121,11 +121,40 @@ function applyColorTheme(theme) {
 function getConnectionProfiles() {
   const profiles = [{ value: '', label: '메인 프로필 사용 (기본)' }];
   $('#connection_profiles option').each(function () {
-    const val = $(this).val();
     const text = $(this).text().trim();
-    if (val && text && text !== '<None>') profiles.push({ value: val, label: text });
+    if (text && text !== '<None>') profiles.push({ value: text, label: text });
   });
   return profiles;
+}
+
+// 설정에서 고른 연결 프로필로 잠깐 전환했다가 생성 후 원래대로 되돌림
+async function generateWithProfile(prompt) {
+  const s = getSettings();
+  const context = getContext();
+  const targetProfile = s.connectionProfile;
+  let previousProfile = '';
+  let switched = false;
+
+  if (targetProfile) {
+    try {
+      previousProfile = $('#connection_profiles').find('option:selected').text().trim();
+      if (previousProfile && previousProfile !== targetProfile) {
+        await context.executeSlashCommandsWithOptions(`/profile ${targetProfile}`);
+        switched = true;
+      }
+    } catch (e) {
+      console.warn('[Bellogue] 연결 프로필 전환 실패, 기본 프로필로 진행합니다:', e);
+    }
+  }
+
+  try {
+    return await context.generateQuietPrompt(prompt, false, false);
+  } finally {
+    if (switched) {
+      try { await context.executeSlashCommandsWithOptions(`/profile ${previousProfile}`); }
+      catch (e) { console.warn('[Bellogue] 연결 프로필 복원 실패:', e); }
+    }
+  }
 }
 
 function escapeHtml(str) {
@@ -170,8 +199,7 @@ ${ERA_RULE}
 ${langLine}`;
 
   try {
-    const context = getContext();
-    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const raw = await generateWithProfile(prompt);
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
@@ -209,8 +237,7 @@ ${ERA_RULE}
 ${langLine}`;
 
   try {
-    const context = getContext();
-    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const raw = await generateWithProfile(prompt);
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
@@ -300,33 +327,42 @@ jQuery(async () => {
     </div>
   `);
 
-  const fields = ['nickname', 'birthday', 'zodiac', 'district', 'job', 'intro'];  fields.forEach(f => {
+  const fields = ['nickname', 'birthday', 'zodiac', 'district', 'job', 'intro'];
+  fields.forEach(f => {
     $(`#bellogue-${f}`).val(settings[f]).on('input', function () {
-      settings[f] = $(this).val();
+      getSettings()[f] = $(this).val();
       saveSettingsDebounced();
     });
   });
   $('#bellogue-color-theme').val(settings.colorTheme).on('change', function () {
-    settings.colorTheme = $(this).val();
-    applyColorTheme(settings.colorTheme);
+    const s = getSettings();
+    s.colorTheme = $(this).val();
+    applyColorTheme(s.colorTheme);
     saveSettingsDebounced();
   });
   $(`input[name="bellogue-language"][value="${settings.language}"]`).prop('checked', true);
   $('input[name="bellogue-language"]').on('change', function () {
-    settings.language = $(this).val();
+    getSettings().language = $(this).val();
     saveSettingsDebounced();
   });
   $('#bellogue-connection-profile').val(settings.connectionProfile).on('change', function () {
-    settings.connectionProfile = $(this).val();
+    getSettings().connectionProfile = $(this).val();
     saveSettingsDebounced();
   });
 
   $('#bellogue-reset-board').on('click', function () {
     if (!confirm('벨로그 안의 모든 데이터(내 글, 프로필, 이웃, 주민센터 글 등)를 전부 지우고 처음 상태로 되돌릴까요? 이 작업은 되돌릴 수 없어요.')) return;
     delete extension_settings[extensionName];
-    getSettings();
+    const fresh = getSettings();
     saveSettingsDebounced();
-    alert('벨로그 데이터를 전부 초기화했어요. 확장프로그램을 다시 열어보세요.');
+    // 리셋 직후에도 패널이 바로 반영되도록 입력값을 다시 채워넣음
+    fields.forEach(f => $(`#bellogue-${f}`).val(fresh[f]));
+    $('#bellogue-color-theme').val(fresh.colorTheme);
+    applyColorTheme(fresh.colorTheme);
+    $(`input[name="bellogue-language"]`).prop('checked', false);
+    $(`input[name="bellogue-language"][value="${fresh.language}"]`).prop('checked', true);
+    $('#bellogue-connection-profile').val(fresh.connectionProfile);
+    alert('벨로그 데이터를 전부 초기화했어요.');
   });
 });
 
@@ -933,8 +969,7 @@ async function generateNeighborReply(neighbor, post, userComment) {
 ${ERA_RULE}
 ${langLine}`;
   try {
-    const context = getContext();
-    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const raw = await generateWithProfile(prompt);
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
@@ -1094,8 +1129,7 @@ ${ERA_RULE}
 ${langLine}`;
 
   try {
-    const context = getContext();
-    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const raw = await generateWithProfile(prompt);
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
@@ -1184,8 +1218,7 @@ ${ERA_RULE}
 ${langLine}`;
 
   try {
-    const context = getContext();
-    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const raw = await generateWithProfile(prompt);
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
@@ -1218,8 +1251,7 @@ async function generateBoardReply(post, userComment) {
 ${ERA_RULE}
 ${langLine}`;
   try {
-    const context = getContext();
-    const raw = await context.generateQuietPrompt(prompt, false, false);
+    const raw = await generateWithProfile(prompt);
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
