@@ -76,6 +76,7 @@ const BOARD_DEFS = [
   { id: 'job', name: '구인구직' },
   { id: 'market', name: '장터' },
 ];
+const BOARD_TOPIC_MAP = { notice: [], suggest: [], free: BOARD_TOPICS, job: ['구인', '구직'], market: ['팝니다', '삽니다'] };
 
 const defaultSettings = {
   nickname: "",
@@ -95,8 +96,9 @@ const defaultSettings = {
   discoverPool: [],     // 발견 탭에 보여줄 NPC 풀, 최대 10명
   discoverPoolSeedVersion: 0,
   neighborSeedVersion: 0,
-  boardPosts: [],        // [{ id, topic, title, body, author, date, comments:[] }]
+  boardPosts: [],        // [{ id, boardId, topic, title, body, author, date, comments:[] }]
   lastBoardAuthor: "",
+  savedBoardPostIds: [],
 };
 
 function getSettings() {
@@ -321,6 +323,8 @@ function openBellogueModal() {
   dialog._neighborManageMode = false;
   dialog._boardView = null;
   dialog._boardTab = 'free';
+  dialog._boardWriteOpen = false;
+  dialog._boardShowSaved = false;
   showCover(dialog);
   dialog.showModal();
 }
@@ -1043,16 +1047,38 @@ function wireNeighborEvents(dialog) {
 }
 
 
-// 주민센터 "새 글 보기" — 벨 누아 주민 전반 중 아무나 한 명이 새 글을 올림
-async function generateBoardPost() {
+// 최근 유저 채팅 내용을 살짝 참고용으로 가져옴 (실패해도 무시)
+function getRecentChatSnippet() {
+  try {
+    const context = getContext();
+    const chat = context.chat || [];
+    if (!chat.length) return '';
+    return chat.slice(-4).map(m => `${m.name}: ${m.mes}`).join('\n').slice(0, 500);
+  } catch (e) {
+    return '';
+  }
+}
+
+// 주민센터 "새 글 보기" — 지정한 게시판에 벨 누아 주민 아무나 한 명이 새 글을 올림
+async function generateBoardPost(boardId) {
   const s = getSettings();
+  const boardDef = BOARD_DEFS.find(b => b.id === boardId);
+  const topics = BOARD_TOPIC_MAP[boardId] || [];
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
   const avoidAuthor = s.lastBoardAuthor ? `직전 작성자("${s.lastBoardAuthor}")와는 다른 사람이어야 합니다.` : '';
-  const prompt = `1930년대풍 가상 도시 "벨 누아"의 공용 게시판(주민센터)에 올라올 법한 글 하나를 만들어주세요. 작성자는 이 도시에 사는 아무 주민이나 상관없습니다. ${avoidAuthor}
-작성자 이름은 반드시 서구풍 1930년대 분위기의 이름으로 지어주세요 (예: 레이븐, 모라, 실비아, 테오, 이든, 베티, 클라라, 안톤 같은 느낌). 현실적인 한국 이름이나 실존 인물, 유명인 이름은 절대 쓰지 마세요.
-주제는 "${BOARD_TOPICS.join('/')}" 중 하나를 고르세요.
+  const nameRule = boardId === 'notice'
+    ? '작성자는 "벨 누아 시청" 또는 그에 준하는 관리 기관 이름으로 하세요.'
+    : `작성자 이름은 반드시 서구풍 1930년대 분위기의 이름으로 지어주세요 (예: 레이븐, 모라, 실비아, 테오, 이든, 베티, 클라라, 안톤 같은 느낌). 현실적인 한국 이름이나 실존 인물, 유명인 이름은 절대 쓰지 마세요. ${avoidAuthor}`;
+  const topicLine = topics.length ? `주제는 "${topics.join('/')}" 중 하나를 고르세요.` : '';
+  const chatSnippet = getRecentChatSnippet();
+  const chatLine = chatSnippet ? `참고(직접 언급하지 말고 분위기만 은은하게 참고하세요): """${chatSnippet}"""` : '';
+
+  const prompt = `1930년대풍 가상 도시 "벨 누아"의 "${boardDef.name}" 게시판에 올라올 법한 글 하나를 만들어주세요.
+${nameRule}
+${topicLine}
+${chatLine}
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
-{"author":"작성자 이름","topic":"${BOARD_TOPICS.join('|')} 중 하나","title":"제목","body":"본문 (2~4문장)"}
+{"author":"작성자 이름","topic":"${topics.length ? topics.join('|') : '(없으면 빈 문자열)'}","title":"제목","body":"본문 (2~4문장)"}
 ${langLine}`;
 
   try {
@@ -1063,15 +1089,16 @@ ${langLine}`;
     const data = JSON.parse(match[0]);
     const post = {
       id: 'bp_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      boardId,
       author: data.author || '익명의 주민',
-      topic: BOARD_TOPICS.includes(data.topic) ? data.topic : BOARD_TOPICS[Math.floor(Math.random() * BOARD_TOPICS.length)],
+      topic: topics.includes(data.topic) ? data.topic : (topics[0] || ''),
       title: data.title || '오늘의 이야기',
       body: data.body || '별일 없이 지나간 하루였다.',
       date: todayStr(), comments: [],
     };
     const s2 = getSettings();
     s2.boardPosts.unshift(post);
-    if (s2.boardPosts.length > 20) s2.boardPosts.length = 20;
+    capBoardPosts(s2);
     s2.lastBoardAuthor = post.author;
     saveSettingsDebounced();
     return { ok: true };
@@ -1079,6 +1106,26 @@ ${langLine}`;
     console.warn('[Bellogue] 주민센터 새 글 생성 실패:', e);
     return { ok: false };
   }
+}
+
+// 게시판별로 최대 20개까지만 유지 (오래된 것부터 정리)
+function capBoardPosts(s) {
+  const kept = [];
+  BOARD_DEFS.forEach(b => {
+    const forBoard = s.boardPosts.filter(p => (p.boardId || 'free') === b.id).slice(0, 20);
+    kept.push(...forBoard);
+  });
+  s.boardPosts = s.boardPosts.filter(p => kept.includes(p));
+}
+
+// 전체 새로고침 — 모든 게시판에 한 번씩 새 글을 생성
+async function refreshAllBoards() {
+  let anyOk = false;
+  for (const b of BOARD_DEFS) {
+    const result = await generateBoardPost(b.id);
+    if (result.ok) anyOk = true;
+  }
+  return { ok: anyOk };
 }
 
 // 주민센터 글에 유저가 댓글을 달면, 작성자가 짧게 답글을 다는 AI 함수
@@ -1110,52 +1157,94 @@ function boardHtml(dialog) {
   const viewId = dialog._boardView;
   if (viewId) {
     const post = s.boardPosts.find(p => p.id === viewId);
-    if (post) return boardPostDetailHtml(post);
+    if (post) return boardPostDetailHtml(dialog, post);
+  }
+  if (dialog._boardWriteOpen) return boardWriteHtml(dialog);
+
+  const showingSaved = !!dialog._boardShowSaved;
+  const boardTab = dialog._boardTab || 'free';
+
+  const topBar = `
+    <div class="bellogue-feed-header" style="justify-content:space-between;">
+      <span class="bellogue-section-tag" style="margin:0;">🏛 주민센터</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="bellogue-board-saved-toggle" class="bellogue-icon-btn" title="모아보기"><i class="${showingSaved ? 'fa-solid' : 'fa-regular'} fa-bookmark"></i></span>
+        <span id="bellogue-board-refresh-all" class="bellogue-refresh-btn" title="전체 새로고침"><i class="fa-solid fa-rotate"></i></span>
+      </div>
+    </div>
+  `;
+
+  if (showingSaved) {
+    const saved = s.boardPosts.filter(p => s.savedBoardPostIds.includes(p.id));
+    const rows = saved.map(p => `
+      <div class="bellogue-board-row" data-id="${p.id}">
+        ${p.topic ? `<span class="bellogue-stamp">${escapeHtml(p.topic)}</span>` : ''}
+        <span class="bellogue-row-title">${escapeHtml(p.title)}</span>
+        <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
+      </div>
+    `).join('') || `<p class="bellogue-placeholder">보관한 글이 없어요.</p>`;
+    return `<div class="bellogue-board">${topBar}<div class="bellogue-board-list" style="margin-top:12px;">${rows}</div></div>`;
   }
 
-  const boardTab = dialog._boardTab || 'free';
   const navHtml = BOARD_DEFS.map(b =>
     `<a data-board="${b.id}" class="${b.id === boardTab ? 'active' : ''}">${b.name}</a>`
   ).join('');
 
-  let bodyHtml;
-  if (boardTab === 'free') {
-    const rows = s.boardPosts.map(p => `
-      <div class="bellogue-board-row" data-id="${p.id}">
-        <span class="bellogue-stamp">${escapeHtml(p.topic)}</span>
-        <span class="bellogue-row-title">${escapeHtml(p.title)}</span>
-        <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
-      </div>
-    `).join('') || `<p class="bellogue-placeholder">아직 올라온 글이 없어요.<br>새 글 보기를 눌러보세요.</p>`;
-    bodyHtml = `
-      <div class="bellogue-feed-header" style="justify-content:flex-end;">
-        <span id="bellogue-board-refresh" class="bellogue-refresh-btn" title="새 글 보기"><i class="fa-solid fa-rotate"></i></span>
-      </div>
-      <div class="bellogue-board-list">${rows}</div>
-    `;
-  } else {
-    bodyHtml = `<p class="bellogue-placeholder">${escapeHtml(BOARD_DEFS.find(b => b.id === boardTab).name)} (준비 중)</p>`;
-  }
+  const boardPosts = s.boardPosts.filter(p => (p.boardId || 'free') === boardTab);
+  const rows = boardPosts.map(p => `
+    <div class="bellogue-board-row" data-id="${p.id}">
+      ${p.topic ? `<span class="bellogue-stamp">${escapeHtml(p.topic)}</span>` : ''}
+      <span class="bellogue-row-title">${escapeHtml(p.title)}</span>
+      <span class="bellogue-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</span>
+    </div>
+  `).join('') || `<p class="bellogue-placeholder">아직 올라온 글이 없어요.<br>우상단 새로고침을 눌러보세요.</p>`;
 
   return `
     <div class="bellogue-board">
-      <nav class="bellogue-nav" style="margin-bottom:12px;">${navHtml}</nav>
-      ${bodyHtml}
+      ${topBar}
+      <nav class="bellogue-nav" style="margin:12px 0;">${navHtml}</nav>
+      <div class="bellogue-feed-header" style="justify-content:flex-end; margin-bottom:8px;">
+        <span id="bellogue-board-write-btn" class="bellogue-write-btn"><i class="fa-solid fa-feather"></i> 글쓰기</span>
+      </div>
+      <div class="bellogue-board-list">${rows}</div>
     </div>
   `;
 }
 
-function boardPostDetailHtml(post) {
+function boardWriteHtml(dialog) {
+  const boardTab = dialog._boardTab || 'free';
+  const topics = BOARD_TOPIC_MAP[boardTab] || [];
+  const topicOptions = topics.map(t => `<option value="${t}">${t}</option>`).join('');
+  return `
+    <div class="bellogue-write">
+      <p id="bellogue-board-write-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 뒤로</p>
+      <p class="bellogue-settings-label" style="margin:0 0 14px;">${escapeHtml(BOARD_DEFS.find(b => b.id === boardTab).name)}에 글쓰기</p>
+      ${topics.length ? `<select id="bellogue-board-write-topic" class="text_pole" style="margin-bottom:14px;">${topicOptions}</select>` : ''}
+      <input id="bellogue-board-write-title" type="text" class="bellogue-write-title-input" placeholder="제목을 입력하세요">
+      <textarea id="bellogue-board-write-body" class="bellogue-write-textarea" placeholder="내용을 입력하세요..."></textarea>
+      <div class="bellogue-write-actions">
+        <button id="bellogue-board-write-submit" class="bellogue-btn-primary" type="button">등록</button>
+      </div>
+    </div>
+  `;
+}
+
+function boardPostDetailHtml(dialog, post) {
   const bodyHtml = post.body.split(/\n+/).map(p => p.trim()).filter(Boolean)
-    .map((p, i) => `<p class="bellogue-post-para${i === 0 ? ' bellogue-dropcap' : ''}">${escapeHtml(p)}</p>`).join('');
+    .map(p => `<p class="bellogue-post-para">${escapeHtml(p)}</p>`).join('');
   const commentsList = (post.comments || []).map(c => `
     <div class="bellogue-comment-row${c.replyTo ? ' bellogue-comment-reply' : ''}"><p>${c.replyTo ? '<i class="fa-solid fa-reply" style="font-size:9px;color:var(--bn-muted);margin-right:4px;"></i>' : ''}<span class="bellogue-comment-name">${escapeHtml(c.name)}</span> ${escapeHtml(c.text)}</p></div>`).join('');
+  const s = getSettings();
+  const isSaved = s.savedBoardPostIds.includes(post.id);
 
   return `
     <div class="bellogue-post">
-      <p id="bellogue-board-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 목록으로</p>
       <div class="bellogue-post-headrow">
-        <span class="bellogue-meta-badge">${escapeHtml(post.topic)}</span>
+        <p id="bellogue-board-back" class="bellogue-back-link" style="margin:0;"><i class="fa-solid fa-arrow-left"></i> 목록으로</p>
+        <span id="bellogue-board-save-toggle" class="bellogue-icon-btn" title="보관"><i class="${isSaved ? 'fa-solid' : 'fa-regular'} fa-bookmark"></i></span>
+      </div>
+      <div class="bellogue-post-headrow" style="margin-top:14px;">
+        ${post.topic ? `<span class="bellogue-meta-badge">${escapeHtml(post.topic)}</span>` : ''}
       </div>
       <p class="bellogue-post-title-lg">${escapeHtml(post.title)}</p>
       <p class="bellogue-post-subtitle">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</p>
@@ -1178,22 +1267,59 @@ function wireBoardEvents(dialog) {
   scroll.querySelectorAll('.bellogue-nav a[data-board]').forEach(a => {
     a.addEventListener('click', function () {
       dialog._boardTab = this.dataset.board;
+      dialog._boardShowSaved = false;
       showTab(dialog, 'board');
     });
   });
 
-  const refreshBtn = scroll.querySelector('#bellogue-board-refresh');
-  if (refreshBtn) refreshBtn.addEventListener('click', async function () {
-    if (refreshBtn.dataset.loading === '1') return;
-    refreshBtn.dataset.loading = '1';
-    refreshBtn.classList.add('bellogue-spin');
-    const result = await generateBoardPost();
+  const savedToggle = scroll.querySelector('#bellogue-board-saved-toggle');
+  if (savedToggle) savedToggle.addEventListener('click', function () {
+    dialog._boardShowSaved = !dialog._boardShowSaved;
+    showTab(dialog, 'board');
+  });
+
+  const refreshAllBtn = scroll.querySelector('#bellogue-board-refresh-all');
+  if (refreshAllBtn) refreshAllBtn.addEventListener('click', async function () {
+    if (refreshAllBtn.dataset.loading === '1') return;
+    refreshAllBtn.dataset.loading = '1';
+    refreshAllBtn.classList.add('bellogue-spin');
+    const result = await refreshAllBoards();
+    refreshAllBtn.classList.remove('bellogue-spin');
+    refreshAllBtn.dataset.loading = '0';
     if (!result.ok) {
-      refreshBtn.classList.remove('bellogue-spin');
-      refreshBtn.dataset.loading = '0';
       alert('새 글을 불러오지 못했어요. 연결 프로필을 확인해주세요.');
       return;
     }
+    showTab(dialog, 'board');
+  });
+
+  const writeBtn = scroll.querySelector('#bellogue-board-write-btn');
+  if (writeBtn) writeBtn.addEventListener('click', function () {
+    dialog._boardWriteOpen = true;
+    showTab(dialog, 'board');
+  });
+  const writeBack = scroll.querySelector('#bellogue-board-write-back');
+  if (writeBack) writeBack.addEventListener('click', function () {
+    dialog._boardWriteOpen = false;
+    showTab(dialog, 'board');
+  });
+  const writeSubmit = scroll.querySelector('#bellogue-board-write-submit');
+  if (writeSubmit) writeSubmit.addEventListener('click', function () {
+    const title = scroll.querySelector('#bellogue-board-write-title').value.trim();
+    const body = scroll.querySelector('#bellogue-board-write-body').value.trim();
+    if (!title || !body) { alert('제목과 내용을 모두 입력해주세요.'); return; }
+    const topicEl = scroll.querySelector('#bellogue-board-write-topic');
+    const s = getSettings();
+    s.boardPosts.unshift({
+      id: 'bp_' + Date.now(),
+      boardId: dialog._boardTab || 'free',
+      author: s.nickname || '나',
+      topic: topicEl ? topicEl.value : '',
+      title, body, date: todayStr(), comments: [],
+    });
+    capBoardPosts(s);
+    saveSettingsDebounced();
+    dialog._boardWriteOpen = false;
     showTab(dialog, 'board');
   });
 
@@ -1206,6 +1332,19 @@ function wireBoardEvents(dialog) {
 
   const backEl = scroll.querySelector('#bellogue-board-back');
   if (backEl) backEl.addEventListener('click', () => { dialog._boardView = null; showTab(dialog, 'board'); });
+
+  const saveToggle = scroll.querySelector('#bellogue-board-save-toggle');
+  if (saveToggle) saveToggle.addEventListener('click', function () {
+    const s = getSettings();
+    const id = dialog._boardView;
+    if (s.savedBoardPostIds.includes(id)) {
+      s.savedBoardPostIds = s.savedBoardPostIds.filter(x => x !== id);
+    } else {
+      s.savedBoardPostIds.push(id);
+    }
+    saveSettingsDebounced();
+    showTab(dialog, 'board');
+  });
 
   const submitBtn = scroll.querySelector('#bellogue-board-comment-submit');
   if (submitBtn) submitBtn.addEventListener('click', async function () {
