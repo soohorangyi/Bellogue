@@ -172,9 +172,7 @@ function showCover(dialog) {
 
   scroll.innerHTML = `
     <div class="bellogue-cover">
-      <div class="bellogue-cover-icon">
-        <svg viewBox="0 0 64 64" fill="currentColor"><path d="M46 20c2-3 5-4 8-3-1 3-3 5-6 6 2 1 3 3 3 5 0 6-6 10-13 10-1 4-4 7-8 8 1 2 1 4 0 6H15c1-3 3-5 6-6-5-2-9-7-9-13 0-8 8-14 17-14 3 0 6 1 8 2-1-3 0-6 3-8 2-1 5-1 6 1-2 0-4 1-4 3 0 1 1 2 2 2 1 0 2-1 2-2z"/></svg>
-      </div>
+      <div class="bellogue-cover-icon"><i class="fa-solid fa-moon"></i></div>
       <div class="bellogue-cover-rule"></div>
       <p class="bellogue-logo">BELLOGUE</p>
       <button id="bellogue-open-btn" class="bellogue-open-btn">OPEN</button>
