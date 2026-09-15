@@ -442,6 +442,7 @@ function openBellogueModal() {
   dialog._boardWriteDraft = null;
   dialog._boardShowSaved = false;
   dialog._subscribeTab = 'horoscope';
+  dialog._novelChapterView = null;
   showCover(dialog);
   dialog.showModal();
   ensureHoroscopeAndBooks(dialog);
@@ -1482,8 +1483,9 @@ async function generateNextChapter() {
     ? `${WORLD_GUARD}
 1930년대풍 가상 도시 "벨 누아"를 배경으로 한 신문 연재소설을 새로 시작해주세요. ${genreRule}
 소설 제목과 부제(태그라인), 그리고 1화를 만들어주세요. 1화 끝은 다음 화가 궁금해지는 궁금증 유발 포인트(클리프행어)로 마무리하세요.
+chapterTitle에는 "1화", "제1화" 같은 화수 표시를 절대 넣지 마세요. 화수는 목록에 자동으로 붙으니, 순수한 소제목만 적으세요.
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
-{"novelTitle":"소설 제목","tagline":"부제(한 줄)","chapterTitle":"1화 소제목","chapterBody":"1화 본문 (4~6문장)"}
+{"novelTitle":"소설 제목","tagline":"부제(한 줄)","chapterTitle":"소제목만(화수 없이)","chapterBody":"1화 본문 (4~6문장)"}
 ${ERA_RULE}
 ${TONE_RULE}
 ${langLine}`
@@ -1491,8 +1493,9 @@ ${langLine}`
 1930년대풍 가상 도시 "벨 누아"를 배경으로 한 신문 연재소설 "${s.novel.title}"(${s.novel.tagline})의 다음 화를 이어서 써주세요. ${genreRule}
 직전 화 내용: "${lastChapter.title} — ${lastChapter.body}"
 이번 화도 끝은 다음 화가 궁금해지는 클리프행어로 마무리하세요.
+chapterTitle에는 "2화", "제2화" 같은 화수 표시를 절대 넣지 마세요. 화수는 목록에 자동으로 붙으니, 순수한 소제목만 적으세요.
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
-{"chapterTitle":"이번 화 소제목","chapterBody":"이번 화 본문 (4~6문장)"}
+{"chapterTitle":"소제목만(화수 없이)","chapterBody":"이번 화 본문 (4~6문장)"}
 ${ERA_RULE}
 ${TONE_RULE}
 ${langLine}`;
@@ -1502,19 +1505,21 @@ ${langLine}`;
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON');
     const data = JSON.parse(match[0]);
+    const cleanChapterTitle = String(data.chapterTitle || '').replace(/^\s*제?\d+\s*화\s*[:：\-]?\s*/, '');
     const s2 = getSettings();
     if (isFirst) {
       s2.novel.title = data.novelTitle || '항구의 비밀';
       s2.novel.tagline = data.tagline || '';
     }
-    s2.novel.chapters.push({
+    const newChapter = {
       id: 'ch_' + Date.now(),
-      title: data.chapterTitle || `${s2.novel.chapters.length + 1}화`,
+      title: cleanChapterTitle || `${s2.novel.chapters.length + 1}화`,
       body: data.chapterBody || '...',
       date: todayStr(),
-    });
+    };
+    s2.novel.chapters.push(newChapter);
     saveSettingsDebounced();
-    return { ok: true };
+    return { ok: true, chapterId: newChapter.id };
   } catch (e) {
     console.warn('[Bellogue] 연재소설 생성 실패:', e);
     return { ok: false };
@@ -1531,13 +1536,15 @@ function subscribeHtml(dialog) {
   let body;
   if (sub === 'books') {
     const books = s.monthlyBooks.books;
+    const genreIcon = (g) => /추리|소설|드라마/.test(g) ? '📖' : /잡지|생활|여성/.test(g) ? '📰' : /시집|산문|수필/.test(g) ? '✒️' : '📚';
     body = books.length
       ? `
-        <p class="bellogue-settings-label" style="text-align:center;margin:0 0 4px;">${escapeHtml(s.monthlyBooks.month.replace('-', '년 '))}월의 추천 도서</p>
+        <span class="bellogue-section-tag" style="margin:0 0 14px;">📚 이달의 책</span>
         ${books.map(b => `
-          <div style="border-bottom:0.5px solid var(--bn-line);padding:14px 2px;">
-            <p style="margin:0;font-size:14px;font-weight:700;">「${escapeHtml(b.title)}」</p>
-            <p style="margin:2px 0 8px;font-size:10.5px;color:var(--bn-muted);">${escapeHtml(b.author)} · ${escapeHtml(b.genre)}</p>
+          <div style="border-left:2px solid var(--bn-accent);padding:2px 0 2px 14px;margin-bottom:16px;">
+            <span class="bellogue-stamp" style="margin-bottom:6px;display:inline-block;">${genreIcon(b.genre)} ${escapeHtml(b.genre)}</span>
+            <p style="margin:2px 0 0;font-size:14px;font-weight:700;">「${escapeHtml(b.title)}」</p>
+            <p style="margin:2px 0 8px;font-size:10.5px;color:var(--bn-muted);">${escapeHtml(b.author)}</p>
             <p style="margin:0;font-size:12px;line-height:1.7;color:var(--bn-ink-soft);">${escapeHtml(b.blurb)}</p>
           </div>
         `).join('')}
@@ -1545,31 +1552,46 @@ function subscribeHtml(dialog) {
       : `<p class="bellogue-placeholder">이달의 책을 준비하는 중이에요...</p>`;
   } else if (sub === 'novel') {
     const chapters = s.novel.chapters;
-    const chapterRows = chapters.map((c, i) => `
-      <div class="bellogue-board-row" data-chapter="${c.id}">
-        <span class="bellogue-row-title">${i + 1}화. ${escapeHtml(c.title)}</span>
-        <span class="bellogue-meta">${escapeHtml(c.date)}</span>
-      </div>
-    `).join('');
-    body = `
-      <div style="text-align:center;margin-bottom:6px;">
-        <p style="font-size:18px;font-weight:700;letter-spacing:0.5px;margin:0;">📚 SERIAL BITES 🥣</p>
-        <p style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--bn-accent);margin:4px 0 2px;">NOT CEREAL!</p>
-        <p style="font-size:10px;font-style:italic;color:var(--bn-muted);margin:0;">Best enjoyed with a glass of milk, anyway</p>
-      </div>
-      <div style="border-top:0.5px solid var(--bn-border);margin:12px 0;"></div>
-      ${s.novel.title ? `
-        <div style="text-align:center;margin-bottom:14px;">
-          <span style="font-size:9px;letter-spacing:2px;color:var(--bn-muted);">주간 연재</span>
-          <p style="font-size:17px;font-weight:700;margin:4px 0 2px;">${escapeHtml(s.novel.title)}</p>
-          <p style="font-size:10.5px;color:var(--bn-muted);">— ${escapeHtml(s.novel.tagline)} —</p>
+    const viewId = dialog._novelChapterView;
+    const viewIndex = viewId ? chapters.findIndex(c => c.id === viewId) : -1;
+
+    if (viewIndex > -1) {
+      const c = chapters[viewIndex];
+      const bodyHtml = c.body.split(/\n+/).map(p => p.trim()).filter(Boolean)
+        .map(p => `<p class="bellogue-post-para">${escapeHtml(p)}</p>`).join('');
+      body = `
+        <p id="bellogue-novel-back" class="bellogue-back-link"><i class="fa-solid fa-arrow-left"></i> 목차로</p>
+        <span class="bellogue-meta-badge">제${viewIndex + 1}화</span>
+        <p class="bellogue-post-title-lg">${escapeHtml(c.title)}</p>
+        <div class="bellogue-post-body">${bodyHtml}</div>
+      `;
+    } else {
+      const chapterRows = chapters.map((c, i) => `
+        <div class="bellogue-board-row" data-chapter="${c.id}">
+          <span class="bellogue-stamp">제${i + 1}화</span>
+          <span class="bellogue-row-title">${escapeHtml(c.title)}</span>
         </div>
-        <div style="border:0.5px solid var(--bn-line);border-radius:3px;">${chapterRows}</div>
-      ` : `<p class="bellogue-placeholder">아직 시작 안 된 이야기예요.<br>첫 화를 열어볼까요?</p>`}
-      <div style="text-align:center;margin-top:14px;">
-        <span id="bellogue-novel-next" class="bellogue-write-btn" style="padding:9px 20px;">${s.novel.title ? '다음 화 보기' : '연재 시작하기'}</span>
-      </div>
-    `;
+      `).join('');
+      body = `
+        <div style="text-align:center;margin-bottom:6px;">
+          <p style="font-size:18px;font-weight:700;letter-spacing:0.5px;margin:0;">📚 SERIAL BITES 🥣</p>
+          <p style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--bn-accent);margin:4px 0 2px;">NOT CEREAL!</p>
+          <p style="font-size:10px;font-style:italic;color:var(--bn-muted);margin:0;">Best enjoyed with a glass of milk, anyway</p>
+        </div>
+        <div style="border-top:0.5px solid var(--bn-border);margin:12px 0;"></div>
+        ${s.novel.title ? `
+          <div style="text-align:center;margin-bottom:14px;">
+            <span style="font-size:9px;letter-spacing:2px;color:var(--bn-muted);">주간 연재</span>
+            <p style="font-size:17px;font-weight:700;margin:4px 0 2px;">${escapeHtml(s.novel.title)}</p>
+            <p style="font-size:10.5px;color:var(--bn-muted);">— ${escapeHtml(s.novel.tagline)} —</p>
+          </div>
+          <div style="border:0.5px solid var(--bn-line);border-radius:3px;">${chapterRows}</div>
+        ` : `<p class="bellogue-placeholder">아직 시작 안 된 이야기예요.<br>첫 화를 열어볼까요?</p>`}
+        <div style="text-align:center;margin-top:14px;">
+          <span id="bellogue-novel-next" class="bellogue-write-btn" style="padding:9px 20px;">${s.novel.title ? '다음 화 보기' : '연재 시작하기'}</span>
+        </div>
+      `;
+    }
   } else if (sub === 'news') {
     body = `
       <div style="text-align:center;padding:60px 0;">
@@ -1604,8 +1626,21 @@ function wireSubscribeEvents(dialog) {
   scroll.querySelectorAll('.bellogue-nav a[data-sub]').forEach(a => {
     a.addEventListener('click', function () {
       dialog._subscribeTab = this.dataset.sub;
+      dialog._novelChapterView = null;
       showTab(dialog, 'subscribe');
     });
+  });
+
+  scroll.querySelectorAll('.bellogue-board-row[data-chapter]').forEach(row => {
+    row.addEventListener('click', function () {
+      dialog._novelChapterView = this.dataset.chapter;
+      showTab(dialog, 'subscribe');
+    });
+  });
+  const novelBack = scroll.querySelector('#bellogue-novel-back');
+  if (novelBack) novelBack.addEventListener('click', function () {
+    dialog._novelChapterView = null;
+    showTab(dialog, 'subscribe');
   });
 
   const newsBtn = scroll.querySelector('#bellogue-news-open');
@@ -1624,6 +1659,7 @@ function wireSubscribeEvents(dialog) {
       alert('다음 화를 불러오지 못했어요. 연결 프로필을 확인해주세요.');
       return;
     }
+    dialog._novelChapterView = result.chapterId;
     showTab(dialog, 'subscribe');
   });
 }
