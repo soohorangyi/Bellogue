@@ -485,24 +485,59 @@ const SUBSCRIBE_SUBTABS = [
   { id: 'news', name: '신문' },
 ];
 
+// 벨 누아 세계관 로어북들 (하나라도 켜져 있으면 인식). 나중에 로어북이 추가되면 여기에 이름만 추가하면 됨.
+const WORLD_NAMES = ['Belle Noir', 'Belle Noir_NPC', 'Nocturne Salon'];
+
+// 현재 활성화된 월드인포(로어북) 이름 목록을 가져옴 (전역 월드인포 선택 + 캐릭터에 바인딩된 기본 로어북)
+function getActiveWorldNames() {
+  const names = [];
+  try {
+    $('#world_info option:selected').each(function () {
+      const t = $(this).text().trim();
+      if (t) names.push(t);
+    });
+  } catch (e) {
+    console.warn('[Bellogue] 전역 월드인포 목록을 읽지 못했어요:', e);
+  }
+  try {
+    const context = getContext();
+    const char = context.characters && context.characters[context.characterId];
+    const boundWorld = char?.data?.extensions?.world;
+    if (boundWorld) names.push(boundWorld);
+  } catch (e) {
+    console.warn('[Bellogue] 캐릭터 바인딩 로어북을 읽지 못했어요:', e);
+  }
+  return names;
+}
+
+function isBelleNoirWorldActive() {
+  const active = getActiveWorldNames().map(n => n.toLowerCase());
+  return WORLD_NAMES.some(w => active.includes(w.toLowerCase()));
+}
+
 function showCover(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
   const tabsBox = dialog.querySelector('#bellogue-index-tabs');
   tabsBox.innerHTML = '';
   dialog.classList.remove('bellogue-open');
 
+  const active = isBelleNoirWorldActive();
+
   scroll.innerHTML = `
-    <div class="bellogue-cover">
+    <div class="bellogue-cover${active ? '' : ' bellogue-cover-locked'}">
       <div class="bellogue-cover-icon"><i class="fa-solid fa-moon"></i></div>
       <div class="bellogue-cover-rule"></div>
       <p class="bellogue-logo">BELLOGUE</p>
-      <button id="bellogue-open-btn" class="bellogue-open-btn">OPEN</button>
+      <button id="bellogue-open-btn" class="bellogue-open-btn" ${active ? '' : 'disabled'}>OPEN</button>
     </div>
   `;
-  scroll.querySelector('#bellogue-open-btn').addEventListener('click', function () {
-    dialog.classList.add('bellogue-open');
-    showTab(dialog, 'blog');
-  });
+  const openBtn = scroll.querySelector('#bellogue-open-btn');
+  if (active) {
+    openBtn.addEventListener('click', function () {
+      dialog.classList.add('bellogue-open');
+      showTab(dialog, 'blog');
+    });
+  }
 }
 
 function renderIndexTabs(dialog, active) {
