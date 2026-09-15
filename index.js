@@ -560,16 +560,20 @@ function showCover(dialog) {
   const active = isBelleNoirWorldActive();
 
   scroll.innerHTML = `
-    <div class="bellogue-cover${active ? '' : ' bellogue-cover-locked'}">
-      <div class="bellogue-cover-icon"><i class="fa-solid fa-moon"></i></div>
-      <div class="bellogue-cover-rule"></div>
-      <p class="bellogue-logo">BELLOGUE</p>
-      <button id="bellogue-open-btn" class="bellogue-open-btn" ${active ? '' : 'disabled'}>OPEN</button>
+    <div id="bellogue-cover" class="bellogue-cover${active ? '' : ' bellogue-cover-locked'}">
+      <div class="bellogue-cover-stitch"></div>
+      <div class="bellogue-cover-content">
+        <div class="bellogue-cover-icon"><i class="fa-solid fa-moon"></i></div>
+        <div class="bellogue-cover-rule"></div>
+        <p class="bellogue-logo">BELLOGUE</p>
+      </div>
+      <div class="bellogue-cover-clasp">
+        <div class="bellogue-cover-clasp-stitch"></div>
+      </div>
     </div>
   `;
-  const openBtn = scroll.querySelector('#bellogue-open-btn');
   if (active) {
-    openBtn.addEventListener('click', function () {
+    scroll.querySelector('#bellogue-cover').addEventListener('click', function () {
       dialog.classList.add('bellogue-open');
       showTab(dialog, 'blog');
     });
