@@ -457,10 +457,13 @@ function buildBellogueDialog() {
   return dialog;
 }
 
+const NEWS_SITE_URL = 'https://soohorangyi.github.io/belle-noir/';
+
 const BELLOGUE_TABS = [
   { id: 'blog', label: '내 벨로그' },
   { id: 'neighbor', label: '이웃 벨로그' },
   { id: 'board', label: '주민센터' },
+  { id: 'news', label: '신문' },
 ];
 
 function showCover(dialog) {
@@ -489,7 +492,13 @@ function renderIndexTabs(dialog, active) {
     `<div class="bellogue-index-tab${t.id === active ? ' active' : ''}" data-tab="${t.id}">${t.label}</div>`
   ).join('');
   tabsBox.querySelectorAll('.bellogue-index-tab').forEach(el => {
-    el.addEventListener('click', () => showTab(dialog, el.dataset.tab));
+    el.addEventListener('click', function () {
+      if (this.dataset.tab === 'news') {
+        window.open(NEWS_SITE_URL, '_blank');
+        return;
+      }
+      showTab(dialog, this.dataset.tab);
+    });
   });
 }
 
