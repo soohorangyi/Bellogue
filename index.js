@@ -79,6 +79,7 @@ const BOARD_DEFS = [
 const BOARD_TOPIC_MAP = { notice: [], suggest: [], free: BOARD_TOPICS, job: ['구인', '구직'], market: ['팝니다', '삽니다'] };
 
 const ERA_RULE = '중요: 이 글/답글은 반드시 1930~1940년대 가상 도시 "벨 누아"의 세계관 안에서만 작성되어야 합니다. 인터넷, 컴퓨터, 스마트폰, API, 앱, 소프트웨어, SNS, 현대 브랜드 등 21세기적인 개념이나 단어는 절대 언급하지 마세요. 편지, 신문, 전보, 축음기, 자동차, 재봉틀 같은 그 시대에 맞는 소재만 사용하세요.';
+const TONE_RULE = '말투는 딱딱한 문어체나 격식체 말고, 편하고 생동감 있는 구어체로 써주세요. 실제 사람이 수다 떨듯이, 감정이 느껴지게 자연스럽게 써주세요. 어울리는 부분에는 이모지도 1~2개 정도 자연스럽게 섞어도 좋아요(과하지 않게, 없어도 괜찮음).';
 
 const WORLD_GUARD = '아주 중요한 규칙: 당신은 1930~1940년대풍 가상 도시 "벨 누아"의 세계관 안에서만 존재합니다. 인터넷, 스마트폰, 컴퓨터, 앱, API, 전자기기, 게임, SNS, 현대 정치·연예인 등 21세기 현실 요소는 절대 언급하거나 암시하지 마세요. 오직 그 시대에 어울리는 소재(거리, 날씨, 사람, 소문, 생업, 사교 등)만 다루세요.';
 
@@ -196,6 +197,7 @@ async function generateNeighborFeedPost() {
 당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${neighbor.name}"입니다. 직업은 ${neighbor.job}, 거주구역은 ${neighbor.district}입니다. 오늘 새로 쓴 짧은 일기를 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"title":"제목","body":"본문 (2~3문장, 1인칭)"}
 ${ERA_RULE}
+${TONE_RULE}
 ${langLine}`;
 
   try {
@@ -248,6 +250,7 @@ async function generateOneNeighborReaction() {
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"text":"댓글 내용 (1문장)"}
 ${ERA_RULE}
+${TONE_RULE}
 ${langLine}`;
 
   try {
@@ -283,6 +286,7 @@ async function generateDiscoverNeighbor() {
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"name":"이름(한 단어)","job":"직업(짧게)","district":"거주구역(짧게)","zodiac":"별자리","birthday":"생년월일 (예: 3월 4일)","intro":"한줄 소개 (20자 내외)","postTitle":"오늘 쓴 일기 제목","postBody":"오늘 쓴 일기 본문 (2~3문장, 1인칭)"}
 ${ERA_RULE}
+${TONE_RULE}
 ${langLine}`;
 
   try {
@@ -553,6 +557,7 @@ function feedHtml(s, manageMode) {
   return `
     <div class="bellogue-feed-header">
       <span id="bellogue-manage-btn" class="bellogue-icon-btn" title="글 관리"><i class="fa-solid fa-gear"></i></span>
+      <span id="bellogue-blog-refresh" class="bellogue-refresh-btn" title="이웃 반응 받기"><i class="fa-solid fa-rotate"></i></span>
       <span id="bellogue-write-btn" class="bellogue-write-btn"><i class="fa-solid fa-feather"></i> 글쓰기</span>
     </div>
     <div class="bellogue-post-list">${rowsHtml}</div>
@@ -737,6 +742,48 @@ function showImageCropper(dialog, srcDataUrl, frameW, frameH, outW, outH, onConf
   });
 }
 
+// 내가 쓴 벨로그 글에, 내 이웃 중 한 명이 댓글을 남겨줌
+async function generateOneBlogReaction() {
+  const s = getSettings();
+  if (s.neighbors.length === 0 || s.posts.length === 0) return { ok: false };
+
+  const candidates = s.posts.filter(p => (p.comments || []).length < 3);
+  if (!candidates.length) return { ok: false };
+  const post = candidates[Math.floor(Math.random() * candidates.length)];
+  const commenter = s.neighbors[Math.floor(Math.random() * s.neighbors.length)];
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = `${WORLD_GUARD}
+당신은 1930년대풍 가상 도시 "벨 누아"에 사는 주민 "${commenter.name}"입니다. 직업은 ${commenter.job}입니다.
+이웃 "${s.nickname || '나'}"이(가) 벨로그에 쓴 글에 짧은 댓글을 하나 남겨주세요.
+제목: ${post.title}
+내용: ${post.body}
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"text":"댓글 내용 (1문장)"}
+${ERA_RULE}
+${TONE_RULE}
+${langLine}`;
+
+  try {
+    const raw = await generateWithProfile(prompt);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON in response');
+    const data = JSON.parse(match[0]);
+    if (!data.text) throw new Error('empty text');
+
+    const s2 = getSettings();
+    const p2 = s2.posts.find(p => p.id === post.id);
+    if (p2) {
+      p2.comments = p2.comments || [];
+      p2.comments.push({ id: 'c_' + Date.now() + '_nb', name: commenter.name, text: data.text });
+      saveSettingsDebounced();
+    }
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 내 벨로그 반응 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
 function wireBlogEvents(dialog) {
   const scroll = dialog.querySelector('#bellogue-scroll');
 
@@ -770,6 +817,21 @@ function wireBlogEvents(dialog) {
 
   scroll.querySelector('#bellogue-manage-btn').addEventListener('click', function () {
     dialog._manageMode = !dialog._manageMode;
+    showTab(dialog, 'blog');
+  });
+
+  const blogRefreshBtn = scroll.querySelector('#bellogue-blog-refresh');
+  if (blogRefreshBtn) blogRefreshBtn.addEventListener('click', async function () {
+    if (blogRefreshBtn.dataset.loading === '1') return;
+    blogRefreshBtn.dataset.loading = '1';
+    blogRefreshBtn.classList.add('bellogue-spin');
+    const result = await generateOneBlogReaction();
+    blogRefreshBtn.classList.remove('bellogue-spin');
+    blogRefreshBtn.dataset.loading = '0';
+    if (!result.ok) {
+      alert('아직 댓글 달아줄 이웃이 없거나(먼저 이웃 벨로그에서 이웃을 만들어보세요), 댓글을 받아오지 못했어요.');
+      return;
+    }
     showTab(dialog, 'blog');
   });
 
@@ -1016,6 +1078,7 @@ async function generateNeighborReply(neighbor, post, userComment) {
 이 댓글에 짧게(1문장) 답글을 남기세요. 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"reply":"답글 내용"}
 ${ERA_RULE}
+${TONE_RULE}
 ${langLine}`;
   try {
     const raw = await generateWithProfile(prompt);
@@ -1178,6 +1241,7 @@ ${topics.length ? `제목에는 "[${topics.join(']이나 [')}]" 같은 말머리
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"author":"작성자 이름","topic":"${topics.length ? topics.join('|') : '(없으면 빈 문자열)'}","title":"제목","body":"본문 (2~4문장)"}
 ${ERA_RULE}
+${TONE_RULE}
 ${langLine}`;
 
   try {
@@ -1258,6 +1322,7 @@ async function generateOneCommunityReaction() {
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"name":"댓글 작성자 이름","text":"댓글 내용 (1문장)"}
 ${ERA_RULE}
+${TONE_RULE}
 ${langLine}`
     : `${WORLD_GUARD}
 다른 벨 누아 주민 한 명이 되어(글쓴이 "${pick.post.author}"는 제외하고), 아래 댓글에 짧게 대댓글을 남겨주세요.
@@ -1267,6 +1332,7 @@ ${langLine}`
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"name":"작성자 이름","text":"대댓글 내용 (1문장)"}
 ${ERA_RULE}
+${TONE_RULE}
 ${langLine}`;
 
   try {
@@ -1301,6 +1367,7 @@ async function generateBoardReply(post, userComment) {
 이 댓글에 짧게(1문장) 답글을 남기세요. 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"reply":"답글 내용"}
 ${ERA_RULE}
+${TONE_RULE}
 ${langLine}`;
   try {
     const raw = await generateWithProfile(prompt);
