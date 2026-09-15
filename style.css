@@ -42,16 +42,28 @@ dialog#bellogue-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 
 .bellogue-frame { border: 2px solid var(--bn-accent); border-radius: 3px; overflow: hidden; aspect-ratio: 2 / 3; }
 dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; height: 540px; }
+dialog#bellogue-dialog:not(.bellogue-open) .bellogue-frame { border: none; overflow: visible; background: transparent; }
 .bellogue-scroll { background: var(--bn-paper); color: var(--bn-ink); height: 100%; overflow-y: auto; display: flex; }
+dialog#bellogue-dialog:not(.bellogue-open) .bellogue-scroll { overflow: visible; background: transparent; }
 
 /* 표지 */
-.bellogue-cover { width: 100%; min-height: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 0 24px; }
-.bellogue-cover-icon { width: 46px; height: 46px; border-radius: 50%; background: var(--bn-accent); color: var(--bn-paper); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 19px; }
-.bellogue-cover-rule { width: 28px; height: 1px; background: var(--bn-border); margin: 0 0 16px; }
-.bellogue-logo { font-size: 23px; font-weight: 600; letter-spacing: 1px; margin: 0 0 22px; }
-.bellogue-open-btn { font-family: 'Noto Serif KR', serif; font-size: 13px; letter-spacing: 2px; border-radius: 2px; padding: 11px 28px; cursor: pointer; background: var(--bn-accent); color: var(--bn-paper); font-weight: 600; border: none; }
-.bellogue-cover-locked { filter: grayscale(1); opacity: 0.55; }
-.bellogue-cover-locked .bellogue-open-btn { cursor: not-allowed; }
+.bellogue-cover {
+  width: 100%; height: 100%; box-sizing: border-box; position: relative;
+  background: #241C17; border: 1.5px solid #120D0A; border-radius: 8px;
+  cursor: pointer;
+}
+.bellogue-cover-stitch { position: absolute; inset: 8px; border: 1px dashed rgba(255,255,255,0.3); border-radius: 4px; pointer-events: none; }
+.bellogue-cover-content { position: absolute; top: 24%; left: 0; right: 0; text-align: center; }
+.bellogue-cover-icon { font-size: 22px; color: #E8DFD3; margin-bottom: 12px; }
+.bellogue-cover-rule { width: 26px; height: 1px; background: rgba(232,223,211,0.5); margin: 0 auto 12px; }
+.bellogue-logo { font-size: 21px; font-weight: 600; letter-spacing: 1px; margin: 0; color: #E8DFD3; }
+.bellogue-cover-clasp {
+  position: absolute; right: -14px; top: 44%; width: 44px; height: 24px;
+  background: #241C17; border: 1.5px solid #120D0A; border-radius: 18px 4px 4px 18px;
+  box-sizing: border-box;
+}
+.bellogue-cover-clasp-stitch { position: absolute; top: 3px; bottom: 3px; left: 6px; right: 3px; border: 1px dashed rgba(255,255,255,0.3); border-radius: 12px 2px 2px 12px; }
+.bellogue-cover-locked { filter: grayscale(1); opacity: 0.55; cursor: not-allowed; }
 
 /* 내 벨로그 스프레드 */
 .bellogue-page { flex: 1; padding: 20px; overflow-y: auto; }
