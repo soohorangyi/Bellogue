@@ -38,6 +38,7 @@ dialog#bellogue-dialog {
   transition: width 0.15s ease;
 }
 dialog#bellogue-dialog.bellogue-open { width: 740px; }
+dialog#bellogue-dialog:not(.bellogue-open) { padding: 0; background: transparent; }
 dialog#bellogue-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 
 .bellogue-frame { border: 2px solid var(--bn-accent); border-radius: 3px; overflow: hidden; aspect-ratio: 2 / 3; }
