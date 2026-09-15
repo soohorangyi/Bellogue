@@ -743,13 +743,10 @@ function showImageCropper(dialog, srcDataUrl, frameW, frameH, outW, outH, onConf
 }
 
 // 내가 쓴 벨로그 글에, 내 이웃 중 한 명이 댓글을 남겨줌
-async function generateOneBlogReaction() {
+// 특정 벨로그 글에 이웃 한 명이 댓글을 남기게 함
+async function generateCommentForBlogPost(post) {
   const s = getSettings();
-  if (s.neighbors.length === 0 || s.posts.length === 0) return { ok: false };
-
-  const candidates = s.posts.filter(p => (p.comments || []).length < 3);
-  if (!candidates.length) return { ok: false };
-  const post = candidates[Math.floor(Math.random() * candidates.length)];
+  if (s.neighbors.length === 0) return { ok: false };
   const commenter = s.neighbors[Math.floor(Math.random() * s.neighbors.length)];
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
   const prompt = `${WORLD_GUARD}
@@ -779,9 +776,19 @@ ${langLine}`;
     }
     return { ok: true };
   } catch (e) {
-    console.warn('[Bellogue] 내 벨로그 반응 생성 실패:', e);
+    console.warn('[Bellogue] 벨로그 댓글 생성 실패:', e);
     return { ok: false };
   }
+}
+
+// 내가 쓴 벨로그 글 중 댓글 적은 것 하나를 골라 이웃 반응을 받아옴 (수동 새로고침용)
+async function generateOneBlogReaction() {
+  const s = getSettings();
+  if (s.neighbors.length === 0 || s.posts.length === 0) return { ok: false };
+  const candidates = s.posts.filter(p => (p.comments || []).length < 3);
+  if (!candidates.length) return { ok: false };
+  const post = candidates[Math.floor(Math.random() * candidates.length)];
+  return generateCommentForBlogPost(post);
 }
 
 function wireBlogEvents(dialog) {
@@ -914,27 +921,36 @@ function showWrite(dialog, editingId, draft) {
     reader.readAsDataURL(file);
   });
 
-  scroll.querySelector('#bellogue-write-submit').addEventListener('click', function () {
+  scroll.querySelector('#bellogue-write-submit').addEventListener('click', async function () {
     const title = scroll.querySelector('#bellogue-write-title').value.trim();
     const body = scroll.querySelector('#bellogue-write-body').value.trim();
     if (!title || !body) { alert('제목과 내용을 모두 입력해주세요.'); return; }
 
     const s2 = getSettings();
+    let newPost = null;
     if (editingPost) {
       editingPost.title = title;
       editingPost.body = body;
       if (pendingImage) editingPost.image = pendingImage;
     } else {
-      s2.posts.unshift({
+      newPost = {
         id: 'post_' + Date.now(),
         title, body,
         image: pendingImage,
         date: new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),
         comments: [],
-      });
+      };
+      s2.posts.unshift(newPost);
     }
     saveSettingsDebounced();
     dialog._mobileSub = 'feed';
+
+    if (newPost) {
+      const submitBtn = scroll.querySelector('#bellogue-write-submit');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-rotate bellogue-spin"></i>';
+      await generateCommentForBlogPost(newPost);
+    }
     showTab(dialog, 'blog');
   });
 }
@@ -1238,8 +1254,9 @@ async function generateBoardPost(boardId) {
 ${nameRule}
 ${topicLine}
 ${topics.length ? `제목에는 "[${topics.join(']이나 [')}]" 같은 말머리를 절대 넣지 마세요. 뱃지로 이미 표시되니 제목은 순수한 제목만 적으세요.` : ''}
+이 글 아래에 다른 주민 1~2명이 남길 법한 짧은 댓글도 함께 만들어주세요. 댓글 작성자는 반드시 글쓴이와 다른 사람이어야 하고, 이름도 서로 겹치면 안 됩니다. 댓글이 없는 편이 더 자연스러우면 빈 배열로 둬도 됩니다.
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
-{"author":"작성자 이름","topic":"${topics.length ? topics.join('|') : '(없으면 빈 문자열)'}","title":"제목","body":"본문 (2~4문장)"}
+{"author":"작성자 이름","topic":"${topics.length ? topics.join('|') : '(없으면 빈 문자열)'}","title":"제목","body":"본문 (2~4문장)","comments":[{"name":"댓글 작성자","text":"댓글 내용"}]}
 ${ERA_RULE}
 ${TONE_RULE}
 ${langLine}`;
@@ -1250,6 +1267,10 @@ ${langLine}`;
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
     const cleanTitle = String(data.title || '').replace(/^\s*\[[^\]]{1,6}\]\s*/, '');
+    const comments = (Array.isArray(data.comments) ? data.comments : [])
+      .filter(c => c && c.name && c.text)
+      .slice(0, 2)
+      .map((c, i) => ({ id: 'c_' + Date.now() + '_gen' + i, name: c.name, text: c.text }));
     const post = {
       id: 'bp_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       boardId,
@@ -1257,7 +1278,7 @@ ${langLine}`;
       topic: topics.includes(data.topic) ? data.topic : (topics[0] || ''),
       title: cleanTitle || '오늘의 이야기',
       body: data.body || '별일 없이 지나간 하루였다.',
-      date: todayStr(), comments: [],
+      date: todayStr(), comments,
     };
     const s2 = getSettings();
     s2.boardPosts.unshift(post);
@@ -1281,7 +1302,7 @@ function capBoardPosts(s) {
   s.boardPosts = s.boardPosts.filter(p => kept.includes(p));
 }
 
-// 전체 새로고침 — 모든 게시판에 한 번씩 새 글을 생성
+// 전체 새로고침 — 모든 게시판에 한 번씩 새 글을 생성 (댓글은 같은 호출 안에서 함께 생성됨)
 async function refreshAllBoards() {
   const queue = [...BOARD_DEFS];
   const results = [];
@@ -1293,66 +1314,39 @@ async function refreshAllBoards() {
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-  const reaction = await generateOneCommunityReaction();
-  return { ok: results.some(r => r.ok) || reaction.ok };
+  return { ok: results.some(r => r.ok) };
 }
 
-// 내가 쓴 글이나 댓글에, 다른 주민이 댓글·대댓글을 하나 남겨줌
-async function generateOneCommunityReaction() {
+// 내가 직접 쓴 게시판 글에, 다른 주민 한 명이 바로 댓글을 남겨줌
+async function generateCommentForBoardPost(post) {
   const s = getSettings();
-  const myName = s.nickname || '나';
-
-  const candidates = [];
-  s.boardPosts.forEach(p => {
-    if (p.author === myName && (p.comments || []).length < 3) candidates.push({ type: 'post', post: p });
-    (p.comments || []).forEach(c => {
-      if (c.name === myName) candidates.push({ type: 'reply', post: p, comment: c });
-    });
-  });
-  if (!candidates.length) return { ok: false };
-
-  const pick = candidates[Math.floor(Math.random() * candidates.length)];
   const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
-  const prompt = pick.type === 'post'
-    ? `${WORLD_GUARD}
-다른 벨 누아 주민 한 명이 되어, 아래 게시글에 짧은 댓글을 하나 남겨주세요.
-제목: ${pick.post.title}
-내용: ${pick.post.body}
+  const prompt = `${WORLD_GUARD}
+1930년대풍 가상 도시 "벨 누아"의 주민 한 명이 되어, 아래 게시글에 짧은 댓글을 하나 남겨주세요.
+제목: ${post.title}
+내용: ${post.body}
 작성자 이름은 반드시 서구풍 1930년대 분위기로 지어주세요(레이븐, 모라, 실비아, 테오 같은 느낌). 실존 인물·유명인 이름 금지.
 아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
 {"name":"댓글 작성자 이름","text":"댓글 내용 (1문장)"}
 ${ERA_RULE}
 ${TONE_RULE}
-${langLine}`
-    : `${WORLD_GUARD}
-다른 벨 누아 주민 한 명이 되어(글쓴이 "${pick.post.author}"는 제외하고), 아래 댓글에 짧게 대댓글을 남겨주세요.
-게시글 제목: ${pick.post.title}
-댓글: "${pick.comment.text}"
-작성자 이름은 반드시 서구풍 1930년대 분위기로 지어주세요(레이븐, 모라, 실비아, 테오 같은 느낌). 실존 인물·유명인 이름 금지.
-아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
-{"name":"작성자 이름","text":"대댓글 내용 (1문장)"}
-${ERA_RULE}
-${TONE_RULE}
 ${langLine}`;
-
   try {
     const raw = await generateWithProfile(prompt);
     const match = String(raw).match(/\{[\s\S]*\}/);
     if (!match) throw new Error('no JSON in response');
     const data = JSON.parse(match[0]);
-    const newComment = { id: 'c_' + Date.now() + '_react', name: data.name || '익명의 주민', text: data.text || '...' };
-    if (pick.type === 'reply') newComment.replyTo = pick.comment.id;
-
+    if (!data.name || !data.text) throw new Error('empty');
     const s2 = getSettings();
-    const p2 = s2.boardPosts.find(p => p.id === pick.post.id);
+    const p2 = s2.boardPosts.find(p => p.id === post.id);
     if (p2) {
       p2.comments = p2.comments || [];
-      p2.comments.push(newComment);
+      p2.comments.push({ id: 'c_' + Date.now() + '_gen', name: data.name, text: data.text });
       saveSettingsDebounced();
     }
     return { ok: true };
   } catch (e) {
-    console.warn('[Bellogue] 주민 반응 생성 실패:', e);
+    console.warn('[Bellogue] 게시글 댓글 생성 실패:', e);
     return { ok: false };
   }
 }
@@ -1596,7 +1590,7 @@ function wireBoardEvents(dialog) {
   });
 
   const writeSubmit = scroll.querySelector('#bellogue-board-write-submit');
-  if (writeSubmit) writeSubmit.addEventListener('click', function () {
+  if (writeSubmit) writeSubmit.addEventListener('click', async function () {
     const title = scroll.querySelector('#bellogue-board-write-title').value.trim();
     const body = scroll.querySelector('#bellogue-board-write-body').value.trim();
     if (!title || !body) { alert('제목과 내용을 모두 입력해주세요.'); return; }
@@ -1605,7 +1599,7 @@ function wireBoardEvents(dialog) {
       topic = topicSel.value === '__custom__' ? topicCustom.value.trim() : topicSel.value;
     }
     const s = getSettings();
-    s.boardPosts.unshift({
+    const newPost = {
       id: 'bp_' + Date.now(),
       boardId: dialog._boardTab || 'free',
       author: s.nickname || '나',
@@ -1613,11 +1607,16 @@ function wireBoardEvents(dialog) {
       title, body,
       image: dialog._boardWriteDraft?.image || '',
       date: todayStr(), comments: [],
-    });
+    };
+    s.boardPosts.unshift(newPost);
     capBoardPosts(s);
     saveSettingsDebounced();
     dialog._boardWriteOpen = false;
     dialog._boardWriteDraft = null;
+    dialog._boardView = newPost.id;
+    writeSubmit.disabled = true;
+    writeSubmit.innerHTML = '<i class="fa-solid fa-rotate bellogue-spin"></i>';
+    await generateCommentForBoardPost(newPost);
     showTab(dialog, 'board');
   });
 
