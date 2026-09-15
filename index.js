@@ -488,9 +488,12 @@ const SUBSCRIBE_SUBTABS = [
 // 벨 누아 세계관 로어북들 (하나라도 켜져 있으면 인식). 나중에 로어북이 추가되면 여기에 이름만 추가하면 됨.
 const WORLD_NAMES = ['Belle Noir', 'Belle Noir_NPC', 'Nocturne Salon'];
 
-// 현재 활성화된 월드인포(로어북) 이름 목록을 가져옴 (전역 월드인포 선택 + 캐릭터에 바인딩된 기본 로어북)
+// 현재 활성화된 월드인포(로어북) 이름 목록을 가져옴
+// - 전역 월드인포 선택, 캐릭터 기본/추가 바인딩 로어북, 채팅 전용 로어북까지 최대한 폭넓게 확인
 function getActiveWorldNames() {
   const names = [];
+
+  // 1) 전역 월드인포 체크박스/멀티셀렉트
   try {
     $('#world_info option:selected').each(function () {
       const t = $(this).text().trim();
@@ -499,19 +502,52 @@ function getActiveWorldNames() {
   } catch (e) {
     console.warn('[Bellogue] 전역 월드인포 목록을 읽지 못했어요:', e);
   }
+
+  // 2) 채팅 전용 로어북 (이 채팅 파일에만 묶인 것)
+  try {
+    $('#chat_world_info, select[name="chat_world_info"]').find('option:selected').each(function () {
+      const t = $(this).text().trim();
+      if (t && t !== 'None' && t !== '없음') names.push(t);
+    });
+  } catch (e) {
+    console.warn('[Bellogue] 채팅 로어북을 읽지 못했어요:', e);
+  }
+  try {
+    const context = getContext();
+    const chatBoundWorld = context.chatMetadata?.world_info;
+    if (chatBoundWorld) names.push(chatBoundWorld);
+  } catch (e) {
+    console.warn('[Bellogue] 채팅 메타데이터의 로어북을 읽지 못했어요:', e);
+  }
+
+  // 3) 캐릭터에 바인딩된 로어북 (기본 1개 + 추가 로어북들)
   try {
     const context = getContext();
     const char = context.characters && context.characters[context.characterId];
-    const boundWorld = char?.data?.extensions?.world;
-    if (boundWorld) names.push(boundWorld);
+    const ext = char?.data?.extensions;
+    if (ext?.world) names.push(ext.world);
+    if (Array.isArray(ext?.world_info)) names.push(...ext.world_info);
+    if (Array.isArray(ext?.additional_lorebooks)) names.push(...ext.additional_lorebooks);
   } catch (e) {
     console.warn('[Bellogue] 캐릭터 바인딩 로어북을 읽지 못했어요:', e);
   }
+
+  // 4) 캐릭터 상세정보 패널이 열려있다면 그 안의 월드 선택도 확인 (보험)
+  try {
+    $('#character_world option:selected, select[name="character_world"] option:selected').each(function () {
+      const t = $(this).text().trim();
+      if (t && t !== 'None' && t !== '없음') names.push(t);
+    });
+  } catch (e) {
+    console.warn('[Bellogue] 캐릭터 패널 월드 선택을 읽지 못했어요:', e);
+  }
+
   return names;
 }
 
 function isBelleNoirWorldActive() {
   const active = getActiveWorldNames().map(n => n.toLowerCase());
+  console.log('[Bellogue] 감지된 활성 로어북 목록:', getActiveWorldNames());
   return WORLD_NAMES.some(w => active.includes(w.toLowerCase()));
 }
 
