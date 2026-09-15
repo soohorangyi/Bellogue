@@ -50,6 +50,8 @@ dialog#bellogue-dialog.bellogue-open .bellogue-frame { aspect-ratio: auto; heigh
 .bellogue-cover-rule { width: 28px; height: 1px; background: var(--bn-border); margin: 0 0 16px; }
 .bellogue-logo { font-size: 23px; font-weight: 600; letter-spacing: 1px; margin: 0 0 22px; }
 .bellogue-open-btn { font-family: 'Noto Serif KR', serif; font-size: 13px; letter-spacing: 2px; border-radius: 2px; padding: 11px 28px; cursor: pointer; background: var(--bn-accent); color: var(--bn-paper); font-weight: 600; border: none; }
+.bellogue-cover-locked { filter: grayscale(1); opacity: 0.55; }
+.bellogue-cover-locked .bellogue-open-btn { cursor: not-allowed; }
 
 /* 내 벨로그 스프레드 */
 .bellogue-page { flex: 1; padding: 20px; overflow-y: auto; }
