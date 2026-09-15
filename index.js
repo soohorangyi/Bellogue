@@ -104,6 +104,9 @@ const defaultSettings = {
   boardPosts: [],        // [{ id, boardId, topic, title, body, author, date, comments:[] }]
   lastBoardAuthor: "",
   savedBoardPostIds: [],
+  horoscope: { date: "", title: "", body: "" },
+  novel: { title: "", tagline: "", chapters: [] },   // chapters: [{ id, title, body, date }]
+  monthlyBooks: { month: "", books: [] },             // books: [{ title, author, genre, blurb }]
 };
 
 function getSettings() {
@@ -164,6 +167,11 @@ function escapeHtml(str) {
 
 function todayStr() {
   return new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+}
+
+function currentMonthStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}`;
 }
 
 // 처음 한 번(또는 이웃 데이터 구조가 바뀌었을 때), 미리 준비된 이웃 3명으로 교체
@@ -433,8 +441,10 @@ function openBellogueModal() {
   dialog._boardWriteOpen = false;
   dialog._boardWriteDraft = null;
   dialog._boardShowSaved = false;
+  dialog._subscribeTab = 'horoscope';
   showCover(dialog);
   dialog.showModal();
+  ensureHoroscopeAndBooks(dialog);
 }
 
 function buildBellogueDialog() {
@@ -457,13 +467,20 @@ function buildBellogueDialog() {
   return dialog;
 }
 
-const NEWS_SITE_URL = 'https://soohorangyi.github.io/belle-noir/';
+const NEWS_SITE_URL = 'https://soohorangyi.github.io/the-city/';
 
 const BELLOGUE_TABS = [
   { id: 'blog', label: '내 벨로그' },
   { id: 'neighbor', label: '이웃 벨로그' },
   { id: 'board', label: '주민센터' },
-  { id: 'news', label: '신문' },
+  { id: 'subscribe', label: '구독' },
+];
+
+const SUBSCRIBE_SUBTABS = [
+  { id: 'horoscope', name: '운세' },
+  { id: 'books', name: '이달의 책' },
+  { id: 'novel', name: '소설' },
+  { id: 'news', name: '신문' },
 ];
 
 function showCover(dialog) {
@@ -492,13 +509,7 @@ function renderIndexTabs(dialog, active) {
     `<div class="bellogue-index-tab${t.id === active ? ' active' : ''}" data-tab="${t.id}">${t.label}</div>`
   ).join('');
   tabsBox.querySelectorAll('.bellogue-index-tab').forEach(el => {
-    el.addEventListener('click', function () {
-      if (this.dataset.tab === 'news') {
-        window.open(NEWS_SITE_URL, '_blank');
-        return;
-      }
-      showTab(dialog, this.dataset.tab);
-    });
+    el.addEventListener('click', () => showTab(dialog, el.dataset.tab));
   });
 }
 
@@ -512,6 +523,9 @@ function showTab(dialog, name) {
   } else if (name === 'neighbor') {
     scroll.innerHTML = neighborTabHtml(dialog);
     wireNeighborEvents(dialog);
+  } else if (name === 'subscribe') {
+    scroll.innerHTML = subscribeHtml(dialog);
+    wireSubscribeEvents(dialog);
   } else {
     scroll.innerHTML = blogHtml(dialog);
     wireBlogEvents(dialog);
@@ -1383,6 +1397,235 @@ ${langLine}`;
     console.warn('[Bellogue] 주민센터 답글 생성 실패:', e);
     return { ok: false };
   }
+}
+
+// ── 구독 (운세 / 이달의 책 / 소설) ────────────────────────────
+async function ensureHoroscopeAndBooks(dialog) {
+  const s = getSettings();
+  const today = todayStr();
+  const month = currentMonthStr();
+  const jobs = [];
+  if (s.horoscope.date !== today) jobs.push(generateHoroscope());
+  if (s.monthlyBooks.month !== month) jobs.push(generateMonthlyBooks());
+  if (!jobs.length) return;
+  await Promise.all(jobs);
+  if (dialog.open && dialog._activeTab === 'subscribe') showTab(dialog, 'subscribe');
+}
+
+async function generateHoroscope() {
+  const s = getSettings();
+  const zodiacLine = s.zodiac ? `유저의 별자리는 "${s.zodiac}"입니다.` : '유저의 별자리는 알 수 없으니 아무 별자리로나 무난하게 써주세요.';
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = `${WORLD_GUARD}
+1930년대풍 가상 도시 "벨 누아"의 신문에 실릴 법한 오늘의 운세 칼럼을 하나 써주세요. ${zodiacLine}
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"title":"한 줄 헤드라인(운세 요약)","body":"운세 본문 (2~3문장)"}
+${ERA_RULE}
+${TONE_RULE}
+${langLine}`;
+  try {
+    const raw = await generateWithProfile(prompt);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON');
+    const data = JSON.parse(match[0]);
+    const s2 = getSettings();
+    s2.horoscope = { date: todayStr(), title: data.title || '오늘의 운세', body: data.body || '평온한 하루가 될 것입니다.' };
+    saveSettingsDebounced();
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 운세 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
+async function generateMonthlyBooks() {
+  const s = getSettings();
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const prompt = `${WORLD_GUARD}
+1930년대풍 가상 도시 "벨 누아"에서 이번 달 추천할 만한 출판물 3개를 만들어주세요. 소설, 잡지, 산문집, 시집 등 서로 다른 장르로 골고루 섞어주세요.
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"books":[{"title":"제목","author":"저자","genre":"장르(예: 추리소설/여성지/수필집 등)","blurb":"짧은 소개(1~2문장)"}]}
+정확히 3개를 만들어주세요.
+${ERA_RULE}
+${TONE_RULE}
+${langLine}`;
+  try {
+    const raw = await generateWithProfile(prompt);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON');
+    const data = JSON.parse(match[0]);
+    const books = (Array.isArray(data.books) ? data.books : [])
+      .filter(b => b && b.title)
+      .slice(0, 3)
+      .map(b => ({ title: b.title, author: b.author || '작자 미상', genre: b.genre || '', blurb: b.blurb || '' }));
+    if (!books.length) throw new Error('empty books');
+    const s2 = getSettings();
+    s2.monthlyBooks = { month: currentMonthStr(), books };
+    saveSettingsDebounced();
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 이달의 책 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
+// 연재소설 다음 화 생성 (처음이면 제목/태그라인부터, 이후엔 이전 화를 이어서)
+async function generateNextChapter() {
+  const s = getSettings();
+  const langLine = s.language === 'en' ? 'Respond in English.' : '한국어로 답하세요.';
+  const isFirst = s.novel.chapters.length === 0;
+  const lastChapter = isFirst ? null : s.novel.chapters[s.novel.chapters.length - 1];
+
+  const genreRule = '장르는 1930년대 신문 연재 통속소설(막장) 느낌입니다 — 출생의 비밀, 재산 다툼, 숨겨진 정체, 갑작스러운 재회 같은 자극적이고 드라마틱한 전개를 가볍고 재미있게 다루세요. 진지하거나 문학적이지 않아도 됩니다.';
+
+  const prompt = isFirst
+    ? `${WORLD_GUARD}
+1930년대풍 가상 도시 "벨 누아"를 배경으로 한 신문 연재소설을 새로 시작해주세요. ${genreRule}
+소설 제목과 부제(태그라인), 그리고 1화를 만들어주세요. 1화 끝은 다음 화가 궁금해지는 궁금증 유발 포인트(클리프행어)로 마무리하세요.
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"novelTitle":"소설 제목","tagline":"부제(한 줄)","chapterTitle":"1화 소제목","chapterBody":"1화 본문 (4~6문장)"}
+${ERA_RULE}
+${TONE_RULE}
+${langLine}`
+    : `${WORLD_GUARD}
+1930년대풍 가상 도시 "벨 누아"를 배경으로 한 신문 연재소설 "${s.novel.title}"(${s.novel.tagline})의 다음 화를 이어서 써주세요. ${genreRule}
+직전 화 내용: "${lastChapter.title} — ${lastChapter.body}"
+이번 화도 끝은 다음 화가 궁금해지는 클리프행어로 마무리하세요.
+아래 JSON 형식으로만 답하세요. 다른 설명은 붙이지 마세요.
+{"chapterTitle":"이번 화 소제목","chapterBody":"이번 화 본문 (4~6문장)"}
+${ERA_RULE}
+${TONE_RULE}
+${langLine}`;
+
+  try {
+    const raw = await generateWithProfile(prompt);
+    const match = String(raw).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('no JSON');
+    const data = JSON.parse(match[0]);
+    const s2 = getSettings();
+    if (isFirst) {
+      s2.novel.title = data.novelTitle || '항구의 비밀';
+      s2.novel.tagline = data.tagline || '';
+    }
+    s2.novel.chapters.push({
+      id: 'ch_' + Date.now(),
+      title: data.chapterTitle || `${s2.novel.chapters.length + 1}화`,
+      body: data.chapterBody || '...',
+      date: todayStr(),
+    });
+    saveSettingsDebounced();
+    return { ok: true };
+  } catch (e) {
+    console.warn('[Bellogue] 연재소설 생성 실패:', e);
+    return { ok: false };
+  }
+}
+
+function subscribeHtml(dialog) {
+  const s = getSettings();
+  const sub = dialog._subscribeTab || 'horoscope';
+  const navHtml = SUBSCRIBE_SUBTABS.map(t =>
+    `<a data-sub="${t.id}" class="${t.id === sub ? 'active' : ''}">${t.name}</a>`
+  ).join('');
+
+  let body;
+  if (sub === 'books') {
+    const books = s.monthlyBooks.books;
+    body = books.length
+      ? `
+        <p class="bellogue-settings-label" style="text-align:center;margin:0 0 4px;">${escapeHtml(s.monthlyBooks.month.replace('-', '년 '))}월의 추천 도서</p>
+        ${books.map(b => `
+          <div style="border-bottom:0.5px solid var(--bn-line);padding:14px 2px;">
+            <p style="margin:0;font-size:14px;font-weight:700;">「${escapeHtml(b.title)}」</p>
+            <p style="margin:2px 0 8px;font-size:10.5px;color:var(--bn-muted);">${escapeHtml(b.author)} · ${escapeHtml(b.genre)}</p>
+            <p style="margin:0;font-size:12px;line-height:1.7;color:var(--bn-ink-soft);">${escapeHtml(b.blurb)}</p>
+          </div>
+        `).join('')}
+      `
+      : `<p class="bellogue-placeholder">이달의 책을 준비하는 중이에요...</p>`;
+  } else if (sub === 'novel') {
+    const chapters = s.novel.chapters;
+    const chapterRows = chapters.map((c, i) => `
+      <div class="bellogue-board-row" data-chapter="${c.id}">
+        <span class="bellogue-row-title">${i + 1}화. ${escapeHtml(c.title)}</span>
+        <span class="bellogue-meta">${escapeHtml(c.date)}</span>
+      </div>
+    `).join('');
+    body = `
+      <div style="text-align:center;margin-bottom:6px;">
+        <p style="font-size:18px;font-weight:700;letter-spacing:0.5px;margin:0;">📚 SERIAL BITES 🥣</p>
+        <p style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--bn-accent);margin:4px 0 2px;">NOT CEREAL!</p>
+        <p style="font-size:10px;font-style:italic;color:var(--bn-muted);margin:0;">Best enjoyed with a glass of milk, anyway</p>
+      </div>
+      <div style="border-top:0.5px solid var(--bn-border);margin:12px 0;"></div>
+      ${s.novel.title ? `
+        <div style="text-align:center;margin-bottom:14px;">
+          <span style="font-size:9px;letter-spacing:2px;color:var(--bn-muted);">주간 연재</span>
+          <p style="font-size:17px;font-weight:700;margin:4px 0 2px;">${escapeHtml(s.novel.title)}</p>
+          <p style="font-size:10.5px;color:var(--bn-muted);">— ${escapeHtml(s.novel.tagline)} —</p>
+        </div>
+        <div style="border:0.5px solid var(--bn-line);border-radius:3px;">${chapterRows}</div>
+      ` : `<p class="bellogue-placeholder">아직 시작 안 된 이야기예요.<br>첫 화를 열어볼까요?</p>`}
+      <div style="text-align:center;margin-top:14px;">
+        <span id="bellogue-novel-next" class="bellogue-write-btn" style="padding:9px 20px;">${s.novel.title ? '다음 화 보기' : '연재 시작하기'}</span>
+      </div>
+    `;
+  } else if (sub === 'news') {
+    body = `
+      <div style="text-align:center;padding:60px 0;">
+        <p style="font-size:12.5px;color:var(--bn-ink-soft);margin:0 0 16px;">신문은 새 탭에서 열려요</p>
+        <span id="bellogue-news-open" class="bellogue-write-btn" style="padding:9px 20px;">읽으러 가기 ↗</span>
+      </div>
+    `;
+  } else {
+    body = s.horoscope.date
+      ? `
+        <div style="text-align:center;padding:10px 0;">
+          <div style="width:44px;height:44px;border-radius:50%;background:var(--bn-accent-tint);display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 10px;">✨</div>
+          <p style="font-size:10px;color:var(--bn-muted);letter-spacing:1px;margin:0 0 4px;">${escapeHtml(s.horoscope.date)}${s.zodiac ? ' · ' + escapeHtml(s.zodiac) : ''}</p>
+          <p style="font-size:14px;font-weight:600;margin:0 0 14px;">${escapeHtml(s.horoscope.title)}</p>
+          <p style="font-size:12.5px;line-height:1.9;color:var(--bn-ink-soft);text-align:left;">${escapeHtml(s.horoscope.body)}</p>
+        </div>
+      `
+      : `<p class="bellogue-placeholder">오늘의 운세를 준비하는 중이에요...</p>`;
+  }
+
+  return `
+    <div class="bellogue-board">
+      <nav class="bellogue-nav" style="margin-bottom:12px;">${navHtml}</nav>
+      ${body}
+    </div>
+  `;
+}
+
+function wireSubscribeEvents(dialog) {
+  const scroll = dialog.querySelector('#bellogue-scroll');
+
+  scroll.querySelectorAll('.bellogue-nav a[data-sub]').forEach(a => {
+    a.addEventListener('click', function () {
+      dialog._subscribeTab = this.dataset.sub;
+      showTab(dialog, 'subscribe');
+    });
+  });
+
+  const newsBtn = scroll.querySelector('#bellogue-news-open');
+  if (newsBtn) newsBtn.addEventListener('click', () => window.open(NEWS_SITE_URL, '_blank'));
+
+  const nextBtn = scroll.querySelector('#bellogue-novel-next');
+  if (nextBtn) nextBtn.addEventListener('click', async function () {
+    if (nextBtn.dataset.loading === '1') return;
+    nextBtn.dataset.loading = '1';
+    const original = nextBtn.textContent;
+    nextBtn.innerHTML = '<i class="fa-solid fa-rotate bellogue-spin"></i>';
+    const result = await generateNextChapter();
+    if (!result.ok) {
+      nextBtn.textContent = original;
+      nextBtn.dataset.loading = '0';
+      alert('다음 화를 불러오지 못했어요. 연결 프로필을 확인해주세요.');
+      return;
+    }
+    showTab(dialog, 'subscribe');
+  });
 }
 
 // ── 주민센터 ─────────────────────────────────────────────────
