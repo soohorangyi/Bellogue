@@ -1539,7 +1539,10 @@ function subscribeHtml(dialog) {
     const genreIcon = (g) => /추리|소설|드라마/.test(g) ? '📖' : /잡지|생활|여성/.test(g) ? '📰' : /시집|산문|수필/.test(g) ? '✒️' : '📚';
     body = books.length
       ? `
-        <span class="bellogue-section-tag" style="margin:0 0 14px;">📚 이달의 책</span>
+        <div style="text-align:center;margin-bottom:14px;">
+          <p style="font-size:18px;font-weight:700;letter-spacing:0.5px;margin:0;">📚 이달의 책</p>
+        </div>
+        <div style="border-top:0.5px solid var(--bn-border);margin:0 0 16px;"></div>
         ${books.map(b => `
           <div style="border-left:2px solid var(--bn-accent);padding:2px 0 2px 14px;margin-bottom:16px;">
             <span class="bellogue-stamp" style="margin-bottom:6px;display:inline-block;">${genreIcon(b.genre)} ${escapeHtml(b.genre)}</span>
@@ -1585,7 +1588,7 @@ function subscribeHtml(dialog) {
             <p style="font-size:17px;font-weight:700;margin:4px 0 2px;">${escapeHtml(s.novel.title)}</p>
             <p style="font-size:10.5px;color:var(--bn-muted);">— ${escapeHtml(s.novel.tagline)} —</p>
           </div>
-          <div style="border:0.5px solid var(--bn-line);border-radius:3px;">${chapterRows}</div>
+          <div>${chapterRows}</div>
         ` : `<p class="bellogue-placeholder">아직 시작 안 된 이야기예요.<br>첫 화를 열어볼까요?</p>`}
         <div style="text-align:center;margin-top:14px;">
           <span id="bellogue-novel-next" class="bellogue-write-btn" style="padding:9px 20px;">${s.novel.title ? '다음 화 보기' : '연재 시작하기'}</span>
