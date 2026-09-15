@@ -9,7 +9,7 @@
   --bn-muted: #8A8477;
   --bn-line: #E5DED2;
   --bn-border: #35322C;
-  --bn-cover: #3A2E28;
+  --bn-cover: #241C17;
   --bn-accent: #6B4444;
   --bn-accent-tint: rgba(107, 68, 68, 0.14);
   --bn-danger: #A32D2D;
@@ -58,11 +58,11 @@ dialog#bellogue-dialog:not(.bellogue-open) .bellogue-scroll { overflow: visible;
 .bellogue-cover-rule { width: 26px; height: 1px; background: rgba(232,223,211,0.5); margin: 0 auto 12px; }
 .bellogue-logo { font-size: 21px; font-weight: 600; letter-spacing: 1px; margin: 0; color: #E8DFD3; }
 .bellogue-cover-clasp {
-  position: absolute; right: -14px; top: 44%; width: 44px; height: 24px;
-  background: #241C17; border: 1.5px solid #120D0A; border-radius: 18px 4px 4px 18px;
+  position: absolute; right: -18px; top: 43%; width: 58px; height: 32px;
+  background: #241C17; border: 1.5px solid #120D0A; border-radius: 22px 4px 4px 22px;
   box-sizing: border-box;
 }
-.bellogue-cover-clasp-stitch { position: absolute; top: 3px; bottom: 3px; left: 6px; right: 3px; border: 1px dashed rgba(255,255,255,0.3); border-radius: 12px 2px 2px 12px; }
+.bellogue-cover-clasp-stitch { position: absolute; top: 4px; bottom: 4px; left: 7px; right: 3px; border: 1px dashed rgba(255,255,255,0.3); border-radius: 16px 2px 2px 16px; }
 .bellogue-cover-locked { filter: grayscale(1); opacity: 0.55; cursor: not-allowed; }
 
 /* 내 벨로그 스프레드 */
